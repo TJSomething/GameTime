@@ -20,7 +20,10 @@ type GameController(
         task {
             use _ = serviceProvider.CreateAsyncScope()
             
-            do! startFetchGameTask (GetConnection()) id
+            try
+                do! startFetchGameTask (GetConnection()) id
+            with
+                | ex -> logger.LogError($"{ex}")
             
             ()
         }
@@ -81,7 +84,7 @@ type GameController(
                 match game with
                 | Some g ->
                     match g.UpdateFinishedAt with
-                    | Some t -> "Loaded"
+                    | Some _ -> "Loaded"
                     | None -> "Loading"
                 | None -> "Initial"
             this.ViewData["GameId"] <- id

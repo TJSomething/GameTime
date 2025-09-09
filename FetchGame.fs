@@ -159,47 +159,55 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
                 | None ->
                     return (FetchNextPage, { acc with delay = acc.delay * 2 })
             | GotPage xmlDoc ->
-                let plays = extractDataFromXml xmlDoc
-                
-                let title =
-                    match Seq.tryHead plays with
-                    | Some (t, _) -> t
-                    | None -> "<unknown>"
                 let pagePlayCount = getPagePlayCount xmlDoc
-                let total = getPlayTotal xmlDoc
                 
-                let! _ =
-                    conn.ExecuteAsync(
-                        """
-                        update Game
-                        set FetchedPlays = FetchedPlays + @pagePlayCount,
-                            TotalPlays = @total,
-                            UpdateTouchedAt = @now,
-                            Title = @title
-                        where id = @id
-                        """,
-                        {| id = id
-                           pagePlayCount = pagePlayCount
-                           total = total
-                           now = DateTime.Now
-                           title = title |})
-                    
-                let plays =
-                    plays
-                    |> Seq.map snd
-                    |> Seq.toList
-                
-                let! _ =
-                    insert {
-                        into playTable
-                        values plays
-                    } |> conn.InsertOrReplaceAsync
-                
-                let pageCount = List.length plays
-                
-                if pageCount = 0 then
+                if pagePlayCount = 0 then
+                    let! _ =
+                        update {
+                            for g in gameTable do
+                            setColumn g.UpdateFinishedAt (Some DateTime.Now)
+                            setColumn g.UpdateTouchedAt DateTime.Now
+                            where (g.Id = id)
+                        } |> conn.UpdateAsync
+                        
                     return (FetchDone, acc)
                 else
+                    let plays = extractDataFromXml xmlDoc
+                    
+                    let title =
+                        match Seq.tryHead plays with
+                        | Some (t, _) -> Some t
+                        | None -> None
+                        
+                    let total = getPlayTotal xmlDoc
+                    
+                    let! _ =
+                        conn.ExecuteAsync(
+                            """
+                            update Game
+                            set FetchedPlays = FetchedPlays + @pagePlayCount,
+                                TotalPlays = @total,
+                                UpdateTouchedAt = @now,
+                                Title = COALESCE(@title, Title)
+                            where id = @id
+                            """,
+                            {| id = id
+                               pagePlayCount = pagePlayCount
+                               total = total
+                               now = DateTime.Now
+                               title = title |})
+                
+                    let plays =
+                        plays
+                        |> Seq.map snd
+                        |> Seq.toList
+                
+                    let! _ =
+                        insert {
+                            into playTable
+                            values plays
+                        } |> conn.InsertOrReplaceAsync
+                        
                     return (FetchNextPage, { acc with page = acc.page + 1 })
             | FetchDone -> return (FetchDone, acc)
         }
