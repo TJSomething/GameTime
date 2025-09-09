@@ -15,6 +15,7 @@
 
     <ItemGroup>
         <PackageReference Include="Dapper.FSharp" Version="4.9.0" />
+        <PackageReference Include="FSharp.Stats" Version="0.6.0" />
         <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="9.0.0" />
         <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.8" />
     </ItemGroup>

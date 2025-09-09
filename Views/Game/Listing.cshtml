@@ -5,6 +5,7 @@
         <h1>@ViewData["Title"]</h1>
         <p>Plays: @ViewData["PlayCount"]</p>
         <p>Average play time: @ViewData["LengthAverage"]</p>
+        <pre>@ViewData["PercentileTable"]</pre>
     }
     else if (ViewData["Status"]?.ToString() == "Loading")
     {

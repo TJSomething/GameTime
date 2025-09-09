@@ -2,6 +2,7 @@ namespace gametime.Controllers
 
 open System
 open Dapper.FSharp.SQLite
+open FSharp.Stats
 
 open Microsoft.AspNetCore.Mvc
 open Microsoft.Extensions.DependencyInjection
@@ -27,6 +28,40 @@ type GameController(
             
             ()
         }
+    
+    let showPercentiles (plays: Play seq) =
+        let playerCountToTimes =
+            plays
+            |> Seq.fold (fun acc play ->
+                Map.change
+                    play.PlayerCount
+                    (fun oldTimesOpt ->
+                        match oldTimesOpt with
+                        | Some ts -> Some(play.Length :: ts)
+                        | None -> Some([ play.Length ]))
+                    acc)
+                Map.empty
+                
+        let ps = [0.1 .. 0.1 .. 0.9]
+        let textChunks =
+            seq {
+                yield " Players |  Plays"
+                for p in ps do
+                    yield (sprintf " | %4d%%" (int (p * 100.0)))
+                yield "\n"
+                    
+                for (playerCount, playTimes) in (playerCountToTimes |> Map.toSeq) do
+                    let playCount = playTimes |> Seq.length
+                    let sorted = playTimes |> Seq.sort |> Seq.map float
+                    let qs = Quantile.computePercentiles (Quantile.OfSorted.compute) ps sorted
+                    
+                    yield $" %7d{playerCount} | %6d{playCount}"
+                    for q in qs do
+                        yield $" | %5.0f{q}"
+                    yield "\n"
+            }
+        
+        String.Join("", textChunks)
         
     member this.Listing(id: int) =
         task {
@@ -95,6 +130,8 @@ type GameController(
                 | Some g -> g.TotalPlays
                 | None -> 0
             this.ViewData["LengthAverage"] <- average
+            this.ViewData["PercentileTable"] <-
+                showPercentiles plays
 
             return this.View()
         }
