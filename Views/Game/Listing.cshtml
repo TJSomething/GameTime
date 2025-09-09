@@ -1,7 +1,24 @@
-@{
-    ViewData["Title"] = "Game";
-}
-
+@using gametime.Models
 <div class="text-center">
-    <p>This is a game page for game id @ViewData["GameId"].</p>
+    @if (ViewData["Status"]?.ToString() == "Loaded")
+    {
+        <h1>@ViewData["Title"]</h1>
+        <p>Plays: @ViewData["PlayCount"]</p>
+        <p>Average play time: @ViewData["LengthAverage"]</p>
+    }
+    else if (ViewData["Status"]?.ToString() == "Loading")
+    {
+        <h1>@ViewData["Title"]</h1>
+        <p>Plays: @ViewData["PlayCount"] / @ViewData["Total"] loaded</p>
+        <script>
+            setTimeout(() => location.reload(), 10000);
+        </script>
+    }
+    else if (ViewData["Status"]?.ToString() == "Initial")
+    {
+        <p>Loading ...</p>
+        <script>
+            setTimeout(() => location.reload(), 10000);
+        </script>
+    }
 </div>

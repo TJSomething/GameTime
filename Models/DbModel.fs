@@ -9,7 +9,7 @@ open Microsoft.Extensions.Configuration
 
 type Game = {
     Id : int
-    Title : string
+    Title : string option
     AddedAt : DateTime
     UpdateStartedAt : DateTime option
     UpdateFinishedAt : DateTime option
@@ -19,8 +19,6 @@ type Game = {
 type Play = {
     Id : int
     GameId : int
-    UserId : int
-    DatePlayed : DateOnly
     Length : int
     PlayerCount : int
     FetchedAt : DateTime
@@ -29,6 +27,9 @@ type Play = {
 let GetConnection () =
     let conf = ConfigurationBuilder().AddJsonFile("settings.json").Build()
     new SqliteConnection(conf.["sqliteConnectionString"])
+
+let gameTable = table<Game>
+let playTable = table<Play>
  
 module private Internal =
     let mutable isAlreadyInitialized = false
@@ -42,7 +43,7 @@ module private Internal =
                     Id int identity
                         constraint Game_pk
                             primary key,
-                    Title text not null,
+                    Title text null,
                     AddedAt text not null,
                     UpdateStartedAt text null,
                     UpdateFinishedAt text null,
@@ -63,8 +64,6 @@ module private Internal =
                         constraint Play_pk
                             primary key,
                     GameId int not null,
-                    UserId int not null,
-                    DatePlayed text not null,
                     Length int not null,
                     PlayerCount int not null,
                     FetchedAt text not null,

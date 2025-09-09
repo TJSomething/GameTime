@@ -6,9 +6,10 @@
 
     <ItemGroup>
         <Compile Include="Models/ErrorViewModel.fs" />
+        <Compile Include="Models/DbModel.fs" />
+        <Compile Include="FetchGame.fs" />
         <Compile Include="Controllers/HomeController.fs" />
-        <Compile Include="Controllers\GameController.fs" />
-        <Compile Include="Models\DbModel.fs" />
+        <Compile Include="Controllers/GameController.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 
