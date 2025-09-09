@@ -95,11 +95,6 @@ type GameController(
                         return Seq.toList ps
                 }
             
-            let count =
-                match game with
-                | Some g -> g.FetchedPlays
-                | None -> 0
-                
             let average =
                 if List.length plays > 0 then
                     plays
@@ -107,31 +102,58 @@ type GameController(
                 else
                     0.0
             
-            let title =
+            let (status, title, fetchedCount, totalPlays, eta) =
                 match game with
                 | Some g ->
-                    match g.Title with
-                    | Some t -> t
-                    | None -> $"Loading game #{id} ..."
-                | None -> $"Loading game #{id} ..."
+                    match (g.Title, g.UpdateStartedAt, g.UpdateFinishedAt) with
+                    | (Some t, Some st, None) ->
+                        let timeSpent = DateTime.Now - st
+                        let timePerItem = timeSpent / (float g.FetchedPlays)
+                        let itemsLeft = g.TotalPlays - g.FetchedPlays
+                        let timeLeft = timePerItem * (float itemsLeft)
+                        ("Loading",
+                         t,
+                         g.FetchedPlays,
+                         g.TotalPlays,
+                         Some (DateTime.Now + timeLeft))
+                    | (Some t, _, Some _) ->
+                        ("Loaded",
+                         t,
+                         g.FetchedPlays,
+                         g.TotalPlays,
+                         None)
+                    | (Some t, None, _) ->
+                        ("Loading",
+                         t,
+                         0,
+                         0,
+                         None)
+                    | (None, _, _) ->
+                        ("Initial",
+                         $"Game #{id}",
+                         0,
+                         0,
+                         None)
+                    
+                | None ->
+                    ("Initial",
+                     $"Game #{id}",
+                     0,
+                     0,
+                     None)
                 
-            this.ViewData["Status"] <-
-                match game with
-                | Some g ->
-                    match g.UpdateFinishedAt with
-                    | Some _ -> "Loaded"
-                    | None -> "Loading"
-                | None -> "Initial"
+            this.ViewData["Status"] <- status
             this.ViewData["GameId"] <- id
             this.ViewData["Title"] <- title
-            this.ViewData["PlayCount"] <- count
-            this.ViewData["Total"] <- 
-                match game with
-                | Some g -> g.TotalPlays
-                | None -> 0
+            this.ViewData["PlayCount"] <- fetchedCount
+            this.ViewData["Total"] <- totalPlays
             this.ViewData["LengthAverage"] <- average
             this.ViewData["PercentileTable"] <-
                 showPercentiles plays
+                
+            match eta with
+            | Some t -> this.ViewData["eta"] <- t
+            | None -> ()
 
             return this.View()
         }

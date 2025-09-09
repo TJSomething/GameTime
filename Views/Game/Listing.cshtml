@@ -11,6 +11,10 @@
     {
         <h1>@ViewData["Title"]</h1>
         <p>Plays: @ViewData["PlayCount"] / @ViewData["Total"] loaded</p>
+        @if (ViewData.ContainsKey("eta"))
+        {
+            <p>ETA: @ViewData["eta"]</p>
+        }
         <script>
             setTimeout(() => location.reload(), 10000);
         </script>
