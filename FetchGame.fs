@@ -172,10 +172,10 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
                         
                     return (FetchDone, acc)
                 else
-                    let plays = extractDataFromXml xmlDoc
+                    let titlePlayPairs = extractDataFromXml xmlDoc
                     
                     let title =
-                        match Seq.tryHead plays with
+                        match Seq.tryHead titlePlayPairs with
                         | Some (t, _) -> Some t
                         | None -> None
                         
@@ -198,15 +198,17 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
                                title = title |})
                 
                     let plays =
-                        plays
+                        titlePlayPairs
                         |> Seq.map snd
                         |> Seq.toList
                 
-                    let! _ =
-                        insert {
-                            into playTable
-                            values plays
-                        } |> conn.InsertOrReplaceAsync
+                    if List.length plays > 0 then
+                        let! _ =
+                            insert {
+                                into playTable
+                                values plays
+                            } |> conn.InsertOrReplaceAsync
+                        ()
                         
                     return (FetchNextPage, { acc with page = acc.page + 1 })
             | FetchDone -> return (FetchDone, acc)
