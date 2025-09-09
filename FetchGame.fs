@@ -4,14 +4,13 @@ open System
 open System.Data
 open System.Net.Http
 open System.Xml.Linq
+open Dapper
 open Dapper.FSharp.SQLite
 open gametime.Models.DbModel
 
 type private FetchAccumulator =
-    { playsCounted: int
-      delay : int
-      page : int
-      entityInitialized : bool }
+    { delay : int
+      page : int }
 
 type private FetchState =
     | FetchStart
@@ -40,7 +39,12 @@ let private downloadXmlAsync (baseUrl: string) (page: int) (delay: int) =
             printfn $"Error: Status code %d{int response.StatusCode}"
             return None
     }
-    
+
+let private getPagePlayCount (xmlDoc: XDocument) =
+    xmlDoc.Descendants("plays")
+    |> Seq.collect (fun plays -> plays.Descendants("play"))
+    |> Seq.length
+
 let private getPlayTotal (xmlDoc: XDocument) =
     xmlDoc.Descendants("plays")
     |> Seq.tryHead
@@ -100,13 +104,6 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
             
             match state with
             | FetchStart ->
-                let! _ =
-                    delete {
-                        for p in playTable do
-                        where (p.GameId = id)
-                    }
-                    |> conn.DeleteAsync
-                    
                 let! gameResult =
                     select {
                         for g in gameTable do
@@ -123,23 +120,36 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
                                 Id = id
                                 AddedAt = DateTime.Now
                                 Title = None
+                                FetchedPlays = 0
                                 TotalPlays = 0
                                 UpdateFinishedAt = None
+                                UpdateTouchedAt = DateTime.Now
                                 UpdateStartedAt = Some DateTime.Now
                             }
                         } |> conn.InsertAsync
-                    ()
+                    return (FetchNextPage, acc)
+                | Some g when g.IsAbandoned() |> not ->
+                    // If there is an unabandoned job already in progress, let it be.
+                    return (FetchDone, acc)
                 | Some _ ->
                     let! _ =
                         update {
                             for g in gameTable do
                             setColumn g.UpdateStartedAt (Some DateTime.Now)
+                            setColumn g.UpdateTouchedAt DateTime.Now
+                            setColumn g.FetchedPlays 0
                             setColumn g.TotalPlays 0
                             where (g.Id = id)
                         } |> conn.UpdateAsync
-                    ()
-                
-                return (FetchNextPage, acc)
+                        
+                    let! _ =
+                        delete {
+                            for p in playTable do
+                            where (p.GameId = id)
+                        }
+                        |> conn.DeleteAsync
+                        
+                    return (FetchNextPage, acc)
             | FetchNextPage ->
                 let! xmlResult = downloadXmlAsync baseUrl acc.page acc.delay
                 
@@ -151,23 +161,28 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
             | GotPage xmlDoc ->
                 let plays = extractDataFromXml xmlDoc
                 
-                if not acc.entityInitialized then
-                    let title =
-                        match Seq.tryHead plays with
-                        | Some (t, _) -> t
-                        | None -> "<unknown>"
-                    let total = getPlayTotal xmlDoc
-                    
-                    let! _ =
-                        update {
-                            for g in gameTable do
-                            setColumn g.TotalPlays total
-                            setColumn g.Title (Some title)
-                            where (g.Id = id)
-                        }
-                        |> conn.UpdateAsync
-                    
-                    ()
+                let title =
+                    match Seq.tryHead plays with
+                    | Some (t, _) -> t
+                    | None -> "<unknown>"
+                let pagePlayCount = getPagePlayCount xmlDoc
+                let total = getPlayTotal xmlDoc
+                
+                let! _ =
+                    conn.ExecuteAsync(
+                        """
+                        update Game
+                        set FetchedPlays = FetchedPlays + @pagePlayCount,
+                            TotalPlays = @total,
+                            UpdateTouchedAt = @now,
+                            Title = @title
+                        where id = @id
+                        """,
+                        {| id = id
+                           pagePlayCount = pagePlayCount
+                           total = total
+                           now = DateTime.Now
+                           title = title |})
                     
                 let plays =
                     plays
@@ -185,21 +200,23 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
                 if pageCount = 0 then
                     return (FetchDone, acc)
                 else
-                    return (FetchNextPage, {
-                        acc with
-                            page = acc.page + 1
-                            playsCounted = acc.playsCounted + pageCount
-                            entityInitialized = true
-                    })
+                    return (FetchNextPage, { acc with page = acc.page + 1 })
             | FetchDone -> return (FetchDone, acc)
         }
     
     task {
         let mutable state = FetchStart
-        let mutable acc = { playsCounted = 0; delay = 1000; entityInitialized = false; page = 0 }
+        let mutable acc = { delay = 1000; page = 0 }
         
         while state <> FetchDone do
             let! (newState, newAcc) = go state acc
+            let logStatus =
+                match newState with
+                | FetchStart -> $"start {acc}"
+                | FetchNextPage -> $"next {acc}"
+                | GotPage _ -> $"got {acc}"
+                | FetchDone -> $"done {acc}"
+            printfn $"{logStatus}"
             state <- newState
             acc <- newAcc
     }

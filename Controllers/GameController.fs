@@ -42,7 +42,10 @@ type GameController(
                     match game with
                     | None ->
                         // Start in the background
-                        startFetch id
+                        startFetch id |> ignore
+                        return List.empty
+                    | Some g when g.IsAbandoned() ->
+                        startFetch id |> ignore
                         return List.empty
                     | Some _ ->
                         let! ps =
@@ -54,9 +57,13 @@ type GameController(
                         return Seq.toList ps
                 }
             
-            let count = List.length plays
+            let count =
+                match game with
+                | Some g -> g.FetchedPlays
+                | None -> 0
+                
             let average =
-                if count > 0 then
+                if List.length plays > 0 then
                     plays
                     |> List.averageBy (fun p -> p.Length |> float)
                 else

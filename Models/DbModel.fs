@@ -7,22 +7,25 @@ open Dapper.FSharp.SQLite
 open Microsoft.Data.Sqlite
 open Microsoft.Extensions.Configuration
 
-type Game = {
-    Id : int
-    Title : string option
-    AddedAt : DateTime
-    UpdateStartedAt : DateTime option
-    UpdateFinishedAt : DateTime option
-    TotalPlays : int
-}
+type Game =
+    { Id: int
+      Title: string option
+      AddedAt: DateTime
+      UpdateStartedAt: DateTime option
+      UpdateTouchedAt: DateTime
+      UpdateFinishedAt: DateTime option
+      FetchedPlays : int
+      TotalPlays: int }
 
-type Play = {
-    Id : int
-    GameId : int
-    Length : int
-    PlayerCount : int
-    FetchedAt : DateTime
-}
+    member this.IsAbandoned() =
+        TimeSpan.FromSeconds(15L) < DateTime.Now - this.UpdateTouchedAt
+
+type Play =
+    { Id: int
+      GameId: int
+      Length: int
+      PlayerCount: int
+      FetchedAt: DateTime }
 
 let GetConnection () =
     let conf = ConfigurationBuilder().AddJsonFile("settings.json").Build()
@@ -30,7 +33,7 @@ let GetConnection () =
 
 let gameTable = table<Game>
 let playTable = table<Play>
- 
+
 module private Internal =
     let mutable isAlreadyInitialized = false
 
@@ -46,11 +49,14 @@ module private Internal =
                     Title text null,
                     AddedAt text not null,
                     UpdateStartedAt text null,
+                    UpdateTouchedAt text null,
                     UpdateFinishedAt text null,
+                    FetchedPlays int not null,
                     TotalPlays int not null
                 )
                 """
                 |> conn.ExecuteAsync
+
             return ()
         }
 
@@ -71,6 +77,7 @@ module private Internal =
                 )
                 """
                 |> conn.ExecuteAsync
+
             return ()
         }
 
@@ -82,7 +89,7 @@ let safeInit (conn: IDbConnection) =
             do! Internal.initGame conn
             do! Internal.initPlay conn
             Internal.isAlreadyInitialized <- true
-            OptionTypes.register()
+            OptionTypes.register ()
     }
     |> Async.AwaitTask
     |> Async.RunSynchronously
