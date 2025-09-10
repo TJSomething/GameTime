@@ -1,3 +1,3 @@
 {
-  "sqliteConnectionString": "Data Source=gametime.db"
+  "sqliteConnectionString": "Data Source=GameTime.db"
 }

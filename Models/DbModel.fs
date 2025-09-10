@@ -1,7 +1,9 @@
-module gametime.Models.DbModel
+module GameTime.Models.DbModel
 
 open System
 open System.Data
+open System.Diagnostics
+open System.IO
 open Dapper
 open Dapper.FSharp.SQLite
 open Microsoft.Data.Sqlite
@@ -28,7 +30,11 @@ type Play =
       FetchedAt: DateTime }
 
 let GetConnection () =
-    let conf = ConfigurationBuilder().AddJsonFile("settings.json").Build()
+    let conf =
+        ConfigurationBuilder()
+            .AddJsonFile("settings.json")
+            .AddEnvironmentVariables()
+            .Build()
     new SqliteConnection(conf.["sqliteConnectionString"])
 
 let gameTable = table<Game>

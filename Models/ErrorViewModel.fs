@@ -1,4 +1,4 @@
-namespace gametime.Models
+namespace GameTime.Models
 
 open System
 

@@ -1,4 +1,4 @@
-namespace gametime.Controllers
+namespace GameTime.Controllers
 
 open System
 open Dapper.FSharp.SQLite
@@ -8,8 +8,8 @@ open Microsoft.AspNetCore.Mvc
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 
-open gametime.FetchGame
-open gametime.Models.DbModel
+open GameTime.FetchGame
+open GameTime.Models.DbModel
 
 type GameController(
     logger: ILogger<GameController>,

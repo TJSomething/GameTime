@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "gametime", "gametime.fsproj", "{ADACAF78-2A3E-485C-81E3-C9E3323AC71A}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "GameTime", "GameTime.fsproj", "{ADACAF78-2A3E-485C-81E3-C9E3323AC71A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

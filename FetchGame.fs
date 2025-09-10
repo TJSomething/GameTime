@@ -1,4 +1,4 @@
-module gametime.FetchGame
+module GameTime.FetchGame
 
 open System
 open System.Data
@@ -6,7 +6,7 @@ open System.Net.Http
 open System.Xml.Linq
 open Dapper
 open Dapper.FSharp.SQLite
-open gametime.Models.DbModel
+open GameTime.Models.DbModel
 
 type private FetchAccumulator =
     { delay : int

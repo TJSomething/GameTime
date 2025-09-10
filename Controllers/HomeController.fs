@@ -1,11 +1,11 @@
-﻿namespace gametime.Controllers
+﻿namespace GameTime.Controllers
 
 open System.Diagnostics
 
 open Microsoft.AspNetCore.Mvc
 open Microsoft.Extensions.Logging
 
-open gametime.Models
+open GameTime.Models
 
 type HomeController(logger: ILogger<HomeController>) =
     inherit Controller()
