@@ -8,6 +8,12 @@
     
     <PropertyGroup Condition="'$(Configuration)' == 'Release'">
         <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+        <SelfContained>true</SelfContained>
+        <PublishTrimmed>true</PublishTrimmed>
+        <PublishSingleFile>true</PublishSingleFile>
+        <TrimMode>Link</TrimMode>
+        <DebugType>none</DebugType>
+        <DebugSymbols>false</DebugSymbols>
     </PropertyGroup>
 
     <ItemGroup>
