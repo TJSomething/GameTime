@@ -98,120 +98,123 @@ let private extractDataFromXml (doc: XDocument) =
             }))
 
 let startFetchGameTask (conn: IDbConnection) (id: int)  =
-    let rec go (state: FetchState) (acc: FetchAccumulator) =
+    let baseUrl = $"https://boardgamegeek.com/xmlapi2/plays?id=%d{id}"
+    
+    let start (acc: FetchAccumulator) =
         task {
-            let baseUrl = $"https://boardgamegeek.com/xmlapi2/plays?id=%d{id}"
+            let! gameResult =
+                select {
+                    for g in gameTable do
+                    where (g.Id = id)
+                }
+                |> conn.SelectAsync<Game>
             
-            match state with
-            | FetchStart ->
-                let! gameResult =
-                    select {
+            match Seq.tryHead gameResult with
+            | None ->
+                let! _ =
+                    insert {
+                        into gameTable
+                        value {
+                            Id = id
+                            AddedAt = DateTime.Now
+                            Title = None
+                            FetchedPlays = 0
+                            TotalPlays = 0
+                            UpdateFinishedAt = None
+                            UpdateTouchedAt = DateTime.Now
+                            UpdateStartedAt = Some DateTime.Now
+                        }
+                    } |> conn.InsertAsync
+                return (FetchNextPage, acc)
+            | Some g when g.IsAbandoned() |> not ->
+                // If there is an unabandoned job already in progress, let it be.
+                return (FetchDone, acc)
+            | Some _ ->
+                let! _ =
+                    update {
                         for g in gameTable do
+                        setColumn g.UpdateStartedAt (Some DateTime.Now)
+                        setColumn g.UpdateTouchedAt DateTime.Now
+                        setColumn g.FetchedPlays 0
+                        setColumn g.TotalPlays 0
                         where (g.Id = id)
+                    } |> conn.UpdateAsync
+                    
+                let! _ =
+                    delete {
+                        for p in playTable do
+                        where (p.GameId = id)
                     }
-                    |> conn.SelectAsync<Game>
+                    |> conn.DeleteAsync
+                    
+                return (FetchNextPage, acc)
+        }
+    
+    let fetchPage (acc: FetchAccumulator) =
+        task {
+            let! xmlResult = downloadXmlAsync baseUrl acc.page acc.delay
+            
+            match xmlResult with
+            | Some xmlDoc ->
+                return ((GotPage xmlDoc), acc)
+            | None ->
+                return (FetchNextPage, { acc with delay = acc.delay * 2 })
+        }
+    
+    let processPage (xmlDoc: XDocument) (acc: FetchAccumulator) =
+        task {
+            let pagePlayCount = getPagePlayCount xmlDoc
+            
+            if pagePlayCount = 0 then
+                let! _ =
+                    update {
+                        for g in gameTable do
+                        setColumn g.UpdateFinishedAt (Some DateTime.Now)
+                        setColumn g.UpdateTouchedAt DateTime.Now
+                        where (g.Id = id)
+                    } |> conn.UpdateAsync
+                    
+                return (FetchDone, acc)
+            else
+                let titlePlayPairs = extractDataFromXml xmlDoc
                 
-                match Seq.tryHead gameResult with
-                | None ->
+                let title =
+                    match Seq.tryHead titlePlayPairs with
+                    | Some (t, _) -> Some t
+                    | None -> None
+                    
+                let total = getPlayTotal xmlDoc
+                
+                let! _ =
+                    conn.ExecuteAsync(
+                        """
+                        update Game
+                        set FetchedPlays = FetchedPlays + @pagePlayCount,
+                            TotalPlays = @total,
+                            UpdateTouchedAt = @now,
+                            Title = COALESCE(@title, Title)
+                        where id = @id
+                        """,
+                        {| id = id
+                           pagePlayCount = pagePlayCount
+                           total = total
+                           now = DateTime.Now
+                           title = title |})
+            
+                let plays =
+                    titlePlayPairs
+                    |> Seq.map snd
+                    |> Seq.toList
+            
+                if List.length plays > 0 then
                     let! _ =
                         insert {
-                            into gameTable
-                            value {
-                                Id = id
-                                AddedAt = DateTime.Now
-                                Title = None
-                                FetchedPlays = 0
-                                TotalPlays = 0
-                                UpdateFinishedAt = None
-                                UpdateTouchedAt = DateTime.Now
-                                UpdateStartedAt = Some DateTime.Now
-                            }
-                        } |> conn.InsertAsync
-                    return (FetchNextPage, acc)
-                | Some g when g.IsAbandoned() |> not ->
-                    // If there is an unabandoned job already in progress, let it be.
-                    return (FetchDone, acc)
-                | Some _ ->
-                    let! _ =
-                        update {
-                            for g in gameTable do
-                            setColumn g.UpdateStartedAt (Some DateTime.Now)
-                            setColumn g.UpdateTouchedAt DateTime.Now
-                            setColumn g.FetchedPlays 0
-                            setColumn g.TotalPlays 0
-                            where (g.Id = id)
-                        } |> conn.UpdateAsync
-                        
-                    let! _ =
-                        delete {
-                            for p in playTable do
-                            where (p.GameId = id)
-                        }
-                        |> conn.DeleteAsync
-                        
-                    return (FetchNextPage, acc)
-            | FetchNextPage ->
-                let! xmlResult = downloadXmlAsync baseUrl acc.page acc.delay
-                
-                match xmlResult with
-                | Some xmlDoc ->
-                    return ((GotPage xmlDoc), acc)
-                | None ->
-                    return (FetchNextPage, { acc with delay = acc.delay * 2 })
-            | GotPage xmlDoc ->
-                let pagePlayCount = getPagePlayCount xmlDoc
-                
-                if pagePlayCount = 0 then
-                    let! _ =
-                        update {
-                            for g in gameTable do
-                            setColumn g.UpdateFinishedAt (Some DateTime.Now)
-                            setColumn g.UpdateTouchedAt DateTime.Now
-                            where (g.Id = id)
-                        } |> conn.UpdateAsync
-                        
-                    return (FetchDone, acc)
-                else
-                    let titlePlayPairs = extractDataFromXml xmlDoc
+                            into playTable
+                            values plays
+                        } |> conn.InsertOrReplaceAsync
+                    ()
                     
-                    let title =
-                        match Seq.tryHead titlePlayPairs with
-                        | Some (t, _) -> Some t
-                        | None -> None
-                        
-                    let total = getPlayTotal xmlDoc
-                    
-                    let! _ =
-                        conn.ExecuteAsync(
-                            """
-                            update Game
-                            set FetchedPlays = FetchedPlays + @pagePlayCount,
-                                TotalPlays = @total,
-                                UpdateTouchedAt = @now,
-                                Title = COALESCE(@title, Title)
-                            where id = @id
-                            """,
-                            {| id = id
-                               pagePlayCount = pagePlayCount
-                               total = total
-                               now = DateTime.Now
-                               title = title |})
-                
-                    let plays =
-                        titlePlayPairs
-                        |> Seq.map snd
-                        |> Seq.toList
-                
-                    if List.length plays > 0 then
-                        let! _ =
-                            insert {
-                                into playTable
-                                values plays
-                            } |> conn.InsertOrReplaceAsync
-                        ()
-                        
-                    return (FetchNextPage, { acc with page = acc.page + 1 })
-            | FetchDone -> return (FetchDone, acc)
+                return (FetchNextPage, { acc with page = acc.page + 1 })
         }
     
     task {
@@ -219,14 +222,12 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
         let mutable acc = { delay = 1000; page = 0 }
         
         while state <> FetchDone do
-            let! (newState, newAcc) = go state acc
-            let logStatus =
-                match newState with
-                | FetchStart -> $"start {acc}"
-                | FetchNextPage -> $"next {acc}"
-                | GotPage _ -> $"got {acc}"
-                | FetchDone -> $"done {acc}"
-            printfn $"{logStatus}"
+            let! (newState, newAcc) =
+                match state with
+                | FetchStart -> start acc
+                | FetchNextPage -> fetchPage acc
+                | GotPage xmlDoc -> processPage xmlDoc acc
+                | FetchDone -> task { return (FetchDone, acc) }
             state <- newState
             acc <- newAcc
     }
