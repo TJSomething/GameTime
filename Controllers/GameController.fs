@@ -11,19 +11,20 @@ open Dapper.FSharp.SQLite
 open FSharp.Stats
 
 open GameTime.FetchGame
-open GameTime.Models.DbModel
+open GameTime.DataAccess
 open GameTime.ViewFns
 
 type IGameController =
-    abstract member Listing : int -> Task<IResult>
+    abstract member Listing: int -> Task<IResult>
 
-type GameController(logger: ILogger<GameController>, serviceProvider: IServiceProvider) =
+type GameController(dbContext: DbContext, logger: ILogger<GameController>, serviceProvider: IServiceProvider) =
     let startFetch (id: int) =
         task {
-            use _ = serviceProvider.CreateAsyncScope()
+            use scope = serviceProvider.CreateAsyncScope()
+            let innerDb = scope.ServiceProvider.GetRequiredService<DbContext>()
 
             try
-                do! startFetchGameTask (GetConnection()) id
+                do! startFetchGameTask innerDb id
             with ex ->
                 logger.LogError($"{ex}")
 
@@ -73,7 +74,7 @@ type GameController(logger: ILogger<GameController>, serviceProvider: IServicePr
     interface IGameController with
         member this.Listing(id: int) =
             task {
-                let conn = GetConnection()
+                use conn = dbContext.GetConnection()
 
                 let! gameResult =
                     select {

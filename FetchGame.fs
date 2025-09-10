@@ -6,7 +6,7 @@ open System.Net.Http
 open System.Xml.Linq
 open Dapper
 open Dapper.FSharp.SQLite
-open GameTime.Models.DbModel
+open GameTime.DataAccess
 
 type private FetchAccumulator =
     { delay : int
@@ -42,7 +42,7 @@ let private downloadXmlAsync (baseUrl: string) (page: int) (delay: int) =
 
 let private getPagePlayCount (xmlDoc: XDocument) =
     xmlDoc.Descendants("plays")
-    |> Seq.collect (fun plays -> plays.Descendants("play"))
+    |> Seq.collect _.Descendants("play")
     |> Seq.length
 
 let private getPlayTotal (xmlDoc: XDocument) =
@@ -97,10 +97,10 @@ let private extractDataFromXml (doc: XDocument) =
                 FetchedAt = DateTime.Now
             }))
 
-let startFetchGameTask (conn: IDbConnection) (id: int)  =
+let startFetchGameTask (db: DbContext) (id: int)  =
     let baseUrl = $"https://boardgamegeek.com/xmlapi2/plays?id=%d{id}"
     
-    let start (acc: FetchAccumulator) =
+    let start (conn: IDbConnection) (acc: FetchAccumulator) =
         task {
             let! gameResult =
                 select {
@@ -161,7 +161,7 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
                 return (FetchNextPage, { acc with delay = acc.delay * 2 })
         }
     
-    let processPage (xmlDoc: XDocument) (acc: FetchAccumulator) =
+    let processPage (conn: IDbConnection) (xmlDoc: XDocument) (acc: FetchAccumulator) =
         task {
             let pagePlayCount = getPagePlayCount xmlDoc
             
@@ -224,9 +224,13 @@ let startFetchGameTask (conn: IDbConnection) (id: int)  =
         while state <> FetchDone do
             let! (newState, newAcc) =
                 match state with
-                | FetchStart -> start acc
+                | FetchStart ->
+                    use conn = db.GetConnection()
+                    start conn acc
                 | FetchNextPage -> fetchPage acc
-                | GotPage xmlDoc -> processPage xmlDoc acc
+                | GotPage xmlDoc ->
+                    use conn = db.GetConnection()
+                    processPage conn xmlDoc acc
                 | FetchDone -> task { return (FetchDone, acc) }
             state <- newState
             acc <- newAcc

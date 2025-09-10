@@ -1,9 +1,7 @@
-module GameTime.Models.DbModel
+module GameTime.DataAccess
 
 open System
 open System.Data
-open System.Diagnostics
-open System.IO
 open Dapper
 open Dapper.FSharp.SQLite
 open Microsoft.Data.Sqlite
@@ -16,11 +14,12 @@ type Game =
       UpdateStartedAt: DateTime option
       UpdateTouchedAt: DateTime
       UpdateFinishedAt: DateTime option
-      FetchedPlays : int
+      FetchedPlays: int
       TotalPlays: int }
 
     member this.IsAbandoned() =
-        this.UpdateFinishedAt.IsNone && TimeSpan.FromSeconds(60L) < DateTime.Now - this.UpdateTouchedAt
+        this.UpdateFinishedAt.IsNone
+        && TimeSpan.FromSeconds(60L) < DateTime.Now - this.UpdateTouchedAt
 
 type Play =
     { Id: int
@@ -29,14 +28,32 @@ type Play =
       PlayerCount: int
       FetchedAt: DateTime }
 
-let GetConnection () =
+type DbContext() =
     let conf =
         ConfigurationBuilder()
             .AddJsonFile("settings.json", optional = true)
             .AddEnvironmentVariables()
             .Build()
-    let connStr = conf.["sqliteConnectionString"]
-    new SqliteConnection(connStr)
+
+    let mutable connection: IDbConnection option = None
+
+    member this.GetConnection() =
+        match connection with
+        | Some conn when conn.State = ConnectionState.Open -> conn
+        | _ ->
+            let connStr = conf.["sqliteConnectionString"]
+            let newConn = new SqliteConnection(connStr)
+            newConn.Open()
+            connection <- Some newConn
+            newConn
+
+    interface IDisposable with
+        member this.Dispose() =
+            match connection with
+            | Some conn when conn.State = ConnectionState.Open ->
+                conn.Close()
+                conn.Dispose()
+            | _ -> ()
 
 let gameTable = table<Game>
 let playTable = table<Play>

@@ -17,8 +17,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Models/ErrorViewModel.fs" />
-        <Compile Include="Models/DbModel.fs" />
+        <Compile Include="DataAccess.fs" />
         <Compile Include="FetchGame.fs" />
         <Compile Include="ViewFns.fs" />
         <Compile Include="Controllers/HomeController.fs" />
