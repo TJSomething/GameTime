@@ -18,8 +18,8 @@
 
     <ItemGroup>
         <Compile Include="DataAccess.fs" />
-        <Compile Include="FetchGame.fs" />
         <Compile Include="ViewFns.fs" />
+        <Compile Include="Services/GameFetcherService.fs" />
         <Compile Include="Controllers/HomeController.fs" />
         <Compile Include="Controllers/GameController.fs" />
         <Compile Include="Program.fs" />

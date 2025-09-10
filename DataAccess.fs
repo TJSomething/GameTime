@@ -17,10 +17,6 @@ type Game =
       FetchedPlays: int
       TotalPlays: int }
 
-    member this.IsAbandoned() =
-        this.UpdateFinishedAt.IsNone
-        && TimeSpan.FromSeconds(60L) < DateTime.Now - this.UpdateTouchedAt
-
 type Play =
     { Id: int
       GameId: int

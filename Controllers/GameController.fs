@@ -2,35 +2,16 @@ namespace GameTime.Controllers
 
 open System
 
-open System.Threading.Tasks
+open GameTime.Services
 open Microsoft.AspNetCore.Http
-open Microsoft.Extensions.DependencyInjection
-open Microsoft.Extensions.Logging
 
 open Dapper.FSharp.SQLite
 open FSharp.Stats
 
-open GameTime.FetchGame
 open GameTime.DataAccess
 open GameTime.ViewFns
 
-type IGameController =
-    abstract member Listing: int -> Task<IResult>
-
-type GameController(dbContext: DbContext, logger: ILogger<GameController>, serviceProvider: IServiceProvider) =
-    let startFetch (id: int) =
-        task {
-            use scope = serviceProvider.CreateAsyncScope()
-            let innerDb = scope.ServiceProvider.GetRequiredService<DbContext>()
-
-            try
-                do! startFetchGameTask innerDb id
-            with ex ->
-                logger.LogError($"{ex}")
-
-            ()
-        }
-
+type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
     let showPercentiles (plays: Play seq) =
         let playerCountToTimes =
             plays
@@ -71,79 +52,78 @@ type GameController(dbContext: DbContext, logger: ILogger<GameController>, servi
 
         String.Join("", textChunks)
 
-    interface IGameController with
-        member this.Listing(id: int) =
-            task {
-                use conn = dbContext.GetConnection()
+    member this.Listing(id: int) =
+        task {
+            use conn = dbContext.GetConnection()
 
-                let! gameResult =
-                    select {
-                        for g in gameTable do
-                            where (g.Id = id)
-                    }
-                    |> conn.SelectAsync<Game>
+            let! gameResult =
+                select {
+                    for g in gameTable do
+                        where (g.Id = id)
+                }
+                |> conn.SelectAsync<Game>
 
-                let game = Seq.tryHead gameResult
+            let game = Seq.tryHead gameResult
 
-                let! plays =
-                    task {
-                        match game with
-                        | None ->
-                            // Start in the background
-                            startFetch id |> ignore
-                            return List.empty
-                        | Some g when g.IsAbandoned() ->
-                            startFetch id |> ignore
-                            return List.empty
-                        | Some _ ->
-                            let! ps =
-                                select {
-                                    for p in playTable do
-                                        where (p.GameId = id)
-                                }
-                                |> conn.SelectAsync<Play>
-
-                            return Seq.toList ps
-                    }
-
-                let average =
-                    if List.length plays > 0 then
-                        plays |> List.averageBy (fun p -> p.Length |> float)
-                    else
-                        0.0
-
-                let (status, title, fetchedCount, totalPlays, eta) =
+            let! plays =
+                task {
                     match game with
-                    | Some g ->
-                        match (g.Title, g.UpdateStartedAt, g.UpdateFinishedAt) with
-                        | (Some t, Some st, None) ->
-                            let timeSpent = DateTime.Now - st
-                            let timePerItem = timeSpent / (float g.FetchedPlays)
-                            let itemsLeft = g.TotalPlays - g.FetchedPlays
-                            let timeLeft = timePerItem * (float itemsLeft)
-                            ("Loading", t, g.FetchedPlays, g.TotalPlays, Some(DateTime.Now + timeLeft))
-                        | (Some t, _, Some _) -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
-                        | (Some t, None, _) -> ("Loading", t, 0, 0, None)
-                        | (None, _, _) -> ("Initial", $"Game #{id}", 0, 0, None)
+                    | None ->
+                        // Start in the background
+                        gameFetcher.EnqueueFetch(id)
+                        return List.empty
+                    | Some g when g.UpdateFinishedAt.IsNone ->
+                        gameFetcher.EnqueueFetch(id)
+                        return List.empty
+                    | Some _ ->
+                        let! ps =
+                            select {
+                                for p in playTable do
+                                    where (p.GameId = id)
+                            }
+                            |> conn.SelectAsync<Play>
 
-                    | None -> ("Initial", $"Game #{id}", 0, 0, None)
+                        return Seq.toList ps
+                }
+
+            let average =
+                if List.length plays > 0 then
+                    plays |> List.averageBy (fun p -> p.Length |> float)
+                else
+                    0.0
+
+            let (status, title, fetchedCount, totalPlays, eta) =
+                match game with
+                | Some g ->
+                    match (g.Title, g.UpdateStartedAt, g.UpdateFinishedAt) with
+                    | (Some t, Some st, None) ->
+                        let timeSpent = DateTime.Now - st
+                        let timePerItem = timeSpent / (float g.FetchedPlays)
+                        let itemsLeft = g.TotalPlays - g.FetchedPlays
+                        let timeLeft = timePerItem * (float itemsLeft)
+                        ("Loading", t, g.FetchedPlays, g.TotalPlays, Some(DateTime.Now + timeLeft))
+                    | (Some t, _, Some _) -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
+                    | (Some t, None, _) -> ("Loading", t, 0, 0, None)
+                    | (None, _, _) -> ("Initial", $"Game #{id}", 0, 0, None)
+
+                | None -> ("Initial", $"Game #{id}", 0, 0, None)
 
 
-                let view =
-                    Listing.View(
-                        status = status,
-                        title = title,
-                        playCount = fetchedCount,
-                        totalPlays = totalPlays,
-                        averagePlayTime = average,
-                        eta = eta,
-                        percentileTable = showPercentiles plays
-                    )
+            let view =
+                Listing.View(
+                    status = status,
+                    title = title,
+                    playCount = fetchedCount,
+                    totalPlays = totalPlays,
+                    averagePlayTime = average,
+                    eta = eta,
+                    percentileTable = showPercentiles plays
+                )
 
-                return
-                    Results.Content(
-                        statusCode = 200,
-                        contentType = "text/html",
-                        content = Giraffe.ViewEngine.RenderView.AsString.htmlDocument view
-                    )
-            }
+            return
+                Results.Content(
+                    statusCode = 200,
+                    contentType = "text/html",
+                    content = Giraffe.ViewEngine.RenderView.AsString.htmlDocument view
+                )
+        }
