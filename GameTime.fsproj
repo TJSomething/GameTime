@@ -5,11 +5,16 @@
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     </PropertyGroup>
+    
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    </PropertyGroup>
 
     <ItemGroup>
         <Compile Include="Models/ErrorViewModel.fs" />
         <Compile Include="Models/DbModel.fs" />
         <Compile Include="FetchGame.fs" />
+        <Compile Include="ViewFns.fs" />
         <Compile Include="Controllers/HomeController.fs" />
         <Compile Include="Controllers/GameController.fs" />
         <Compile Include="Program.fs" />
@@ -18,7 +23,15 @@
     <ItemGroup>
         <PackageReference Include="Dapper.FSharp" Version="4.9.0" />
         <PackageReference Include="FSharp.Stats" Version="0.6.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="9.0.9" />
+        <PackageReference Include="Giraffe.ViewEngine" Version="1.4.0" />
         <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.8" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <TrimmerRootAssembly Include="FSharp.Core" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="wwwroot\css\" />
     </ItemGroup>
 </Project>

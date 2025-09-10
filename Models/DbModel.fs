@@ -32,10 +32,11 @@ type Play =
 let GetConnection () =
     let conf =
         ConfigurationBuilder()
-            .AddJsonFile("settings.json")
+            .AddJsonFile("settings.json", optional = true)
             .AddEnvironmentVariables()
             .Build()
-    new SqliteConnection(conf.["sqliteConnectionString"])
+    let connStr = conf.["sqliteConnectionString"]
+    new SqliteConnection(connStr)
 
 let gameTable = table<Game>
 let playTable = table<Play>

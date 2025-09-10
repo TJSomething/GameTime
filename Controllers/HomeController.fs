@@ -1,24 +1,15 @@
 ﻿namespace GameTime.Controllers
 
-open System.Diagnostics
+open Microsoft.AspNetCore.Http
 
-open Microsoft.AspNetCore.Mvc
-open Microsoft.Extensions.Logging
+open Giraffe.ViewEngine
 
-open GameTime.Models
+open GameTime.ViewFns
 
-type HomeController(logger: ILogger<HomeController>) =
-    inherit Controller()
-
-    member this.Index () =
-        this.View()
-
-    [<ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)>]
-    member this.Error () =
-        let reqId =
-            if isNull Activity.Current then
-                this.HttpContext.TraceIdentifier
-            else
-                Activity.Current.Id
-
-        this.View({ RequestId = reqId })
+type HomeController() =
+    member this.Index() =
+        Results.Content(
+            statusCode = 200,
+            contentType = "text/html",
+            content = RenderView.AsString.htmlDocument homeView
+        )
