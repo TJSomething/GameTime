@@ -25,7 +25,7 @@ let homeView =
         [ h1 [] [ str "GameTime" ]
           divider
           p [] [ str "Search for a board game:" ]
-          input [ _type "text"; _id "search" ]
+          input [ _type "search"; _id "search" ]
           ul [ _id "results" ] []
           script [ _src "/js/index.js" ] [] ]
 
@@ -58,7 +58,8 @@ type Listing =
                             [ p [] [ str $"Loading plays: %d{playCount} / %d{totalPlays}" ] ])
                        (match otherGamesAheadOfThisOne with
                         | Some 1 -> [ p [] [ str "There is 1 game ahead of this one." ] ]
-                        | None | Some 0 -> []
+                        | None
+                        | Some 0 -> []
                         | Some count -> [ p [] [ str $"There are {count} games ahead of this one." ] ])
                        (match eta with
                         | Some t -> [ p [] [ str $"ETA: {t}" ] ]
