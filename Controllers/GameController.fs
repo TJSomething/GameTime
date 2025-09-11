@@ -108,13 +108,19 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                                 let itemsLeft = g.TotalPlays - g.FetchedPlays
                                 let timeLeft = timePerItem * (float itemsLeft)
                                 Some(DateTime.Now + timeLeft)
+
                         ("Loading", t, g.FetchedPlays, g.TotalPlays, eta)
                     | (Some t, _, Some _) -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
                     | (Some t, None, _) -> ("Loading", t, 0, 0, None)
                     | (None, _, _) -> ("Initial", $"Game #{id}", 0, 0, None)
 
-                | (_, None) | (None, _) -> ("Initial", $"Game #{id}", 0, 0, None)
-            
+                | (Some g, None) ->
+                    match g.Title with
+                    | Some t -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
+                    | None -> ("Initial", $"Game #{id}", 0, 0, None)
+                | (_, None)
+                | (None, _) -> ("Initial", $"Game #{id}", 0, 0, None)
+
             let view =
                 Listing.Render(
                     id = id,
