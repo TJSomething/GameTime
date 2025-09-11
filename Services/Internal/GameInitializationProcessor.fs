@@ -18,7 +18,7 @@ type GameInitializationProcessor
     (
         fetcher: XmlFetcher,
         playFetchChannel: ChannelWriter<int>,
-        activeGameIds: ConcurrentDictionary<int, unit>,
+        jobTracker: ActiveJobTracker,
         serviceProvider: IServiceProvider
     ) =
     let jobQueue: int Channel = Channel.CreateUnbounded()
@@ -110,13 +110,13 @@ type GameInitializationProcessor
                     let! id = jobQueue.Reader.ReadAsync(stoppingToken)
                     use conn = dbContext.GetConnection()
 
-                    if activeGameIds.TryAdd(id, ()) then
+                    if jobTracker.StartJob(id) then
                         try
                             do! initializeJob conn id
                             let! gameXml = fetchGame id
                             do! writeGameInfo conn id gameXml
                         with ex ->
-                            activeGameIds.TryRemove(id) |> ignore
+                            jobTracker.CloseJob(id) |> ignore
                             raise (Exception($"Error in fetching game {id}", ex))
 
                         do! playFetchChannel.WriteAsync(id, stoppingToken)

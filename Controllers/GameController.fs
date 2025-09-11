@@ -92,9 +92,11 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                 else
                     0.0
 
+            let gameOrder = gameFetcher.GetJobOrder(id)
+
             let (status, title, fetchedCount, totalPlays, eta) =
-                match game with
-                | Some g ->
+                match (game, gameOrder) with
+                | (Some g, Some _) ->
                     match (g.Title, g.UpdateStartedAt, g.UpdateFinishedAt) with
                     | (Some t, Some st, None) ->
                         let eta =
@@ -111,9 +113,8 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     | (Some t, None, _) -> ("Loading", t, 0, 0, None)
                     | (None, _, _) -> ("Initial", $"Game #{id}", 0, 0, None)
 
-                | None -> ("Initial", $"Game #{id}", 0, 0, None)
-
-
+                | (_, None) | (None, _) -> ("Initial", $"Game #{id}", 0, 0, None)
+            
             let view =
                 Listing.Render(
                     id = id,
@@ -123,7 +124,8 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     totalPlays = totalPlays,
                     averagePlayTime = average,
                     eta = eta,
-                    percentileTable = showPercentiles plays
+                    percentileTable = showPercentiles plays,
+                    otherGamesAheadOfThisOne = gameOrder
                 )
 
             return

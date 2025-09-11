@@ -39,7 +39,8 @@ type Listing =
             totalPlays: int,
             averagePlayTime: float,
             percentileTable: string,
-            eta: DateTime option
+            eta: DateTime option,
+            otherGamesAheadOfThisOne: int option
         ) =
         let statusBody =
             (match status with
@@ -55,6 +56,10 @@ type Listing =
                             [ p [] [ str "Waiting for game to start loading plays..." ] ]
                         else
                             [ p [] [ str $"Loading plays: %d{playCount} / %d{totalPlays}" ] ])
+                       (match otherGamesAheadOfThisOne with
+                        | Some 1 -> [ p [] [ str "There is 1 game ahead of this one." ] ]
+                        | None | Some 0 -> []
+                        | Some count -> [ p [] [ str $"There are {count} games ahead of this one." ] ])
                        (match eta with
                         | Some t -> [ p [] [ str $"ETA: {t}" ] ]
                         | None -> [])
@@ -66,10 +71,5 @@ type Listing =
                    script [] [ rawText "setTimeout(() => location.reload(), 10000);" ] ]
              | _ -> [])
 
-        let forceRefresh =
-            [ form
-                  [ _method "POST"; _action $"/game/{id}/refresh" ]
-                  [ button [ _type "submit"; _class "outline" ] [ str "Force refresh" ] ] ]
-
         // Em dash
-        master $"{title} \u2014 GameTime" (statusBody @ forceRefresh)
+        master $"{title} \u2014 GameTime" statusBody

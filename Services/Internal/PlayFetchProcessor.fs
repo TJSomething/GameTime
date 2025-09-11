@@ -22,7 +22,7 @@ type PlayFetchProcessor(
     fetcher: XmlFetcher,
     serviceProvider: IServiceProvider,
     playJobChannel: ChannelReader<int>,
-    activeGameIds: ConcurrentDictionary<int, unit>
+    jobTracker: ActiveJobTracker
     ) =
     let getPagePlayCount (xmlDoc: XDocument) =
         xmlDoc.Descendants("plays")
@@ -168,7 +168,8 @@ type PlayFetchProcessor(
                             page <- page + 1
                             status <- newStatus
                     finally
-                        activeGameIds.TryRemove(id) |> ignore
+                        // If there's a failure, we don't want the system to think the job's still active
+                        jobTracker.CloseJob(id) |> ignore
                     ()
                 with
                 | :? OperationCanceledException -> ()
