@@ -8,6 +8,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Primitives
 
 open GameTime.Controllers
 open GameTime.DataAccess
@@ -42,7 +43,7 @@ module Program =
         
         app.MapPost("/game/{id}/refresh", Func<int, GameFetcherService, HttpContext, IResult>(fun id fetcher context ->
             fetcher.EnqueueFetch(id)
-            context.Response.Headers.Location = $"/game/{id}"
+            context.Response.Headers.Location = StringValues($"/game/{id}")
             Results.StatusCode(303)))
 
         using (app.Services.CreateScope()) (fun scope ->
