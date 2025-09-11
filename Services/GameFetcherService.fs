@@ -4,8 +4,10 @@ open System
 open System.Collections.Concurrent
 open System.Data
 open System.Net.Http
+open System.Text.RegularExpressions
 open System.Threading.Tasks
 open System.Xml.Linq
+open System.Xml.XPath
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
@@ -17,8 +19,10 @@ open GameTime.DataAccess
 
 type private Job =
     | FetchStart of id : int
+    | FetchGame of id : int
+    | GotGame of id : int * xmlDoc : XDocument
     | FetchNextPage of id : int * page : int
-    | GotPage of id : int * page : int * xmlDoc : XDocument
+    | GotPlayPage of id : int * page : int * xmlDoc : XDocument
     | FetchDone
     
 type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameFetcherService>) =
@@ -84,17 +88,25 @@ type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameF
                     FetchedAt = DateTime.Now
                 }))
         
-    let downloadXmlAsync (baseUrl: string) (page: int) (delay: int) =
+    let downloadXmlAsync (url: string) (delay: int) =
         task {
             use client = new HttpClient()
-            let url = $"%s{baseUrl}&page=%d{page}"
             do! Task.Delay(delay) // Throttle the request with a delay
 
             let! response = client.GetAsync(url)
 
             match response.StatusCode with
             | System.Net.HttpStatusCode.OK ->
-                let! xmlContent = response.Content.ReadAsStringAsync()
+                let! rawXmlContent = response.Content.ReadAsStringAsync()
+                
+                // BGG doesn't escape ampersands correctly
+                let xmlContent =
+                    Regex.Replace(
+                        rawXmlContent,
+                        "&(?!lt;|gt;|amp;|quot;|apos;|#[0-9]+;|#x[0-9a-fA-F]+;)",
+                        "&amp;"
+                    )
+                
                 return Some(XDocument.Parse(xmlContent)) // Return the parsed XDocument
             | System.Net.HttpStatusCode.TooManyRequests ->
                 // Handle 429 errors by increasing the delay and retrying
@@ -121,7 +133,7 @@ type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameF
                         let candidateId =
                             match j with
                             | FetchNextPage(id = candidateId) -> Some candidateId
-                            | GotPage(id = candidateId) -> Some candidateId
+                            | GotPlayPage(id = candidateId) -> Some candidateId
                             | _ -> None
                             
                         candidateId = Some id)
@@ -142,7 +154,7 @@ type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameF
                             UpdateStartedAt = None
                         }
                     } |> conn.InsertAsync
-                return FetchNextPage(id = id, page = 0)
+                return FetchGame(id)
             | Some _ when jobExists ->
                 // Skip the job if it exists already
                 return FetchDone
@@ -164,18 +176,49 @@ type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameF
                     }
                     |> conn.DeleteAsync
                     
-                return FetchNextPage(id = id, page = 0)
+                return FetchGame(id)
         }
         
-    let fetchPage (id: int) (page: int) =
+    let fetchGame (id: int) =
         task {
-            let baseUrl = $"https://boardgamegeek.com/xmlapi2/plays?id=%d{id}"
+            let url = $"https://boardgamegeek.com/xmlapi2/thing?id=%d{id}&type=boardgame"
     
-            let! xmlResult = downloadXmlAsync baseUrl page delay
+            let! xmlResult = downloadXmlAsync url delay
             
             match xmlResult with
             | Some xmlDoc ->
-                return GotPage(id = id, page = page, xmlDoc = xmlDoc)
+                return GotGame(id = id, xmlDoc = xmlDoc)
+            | None ->
+                delay <- delay * 2
+                return FetchGame(id = id)
+        }
+    
+    let processGame (conn: IDbConnection) (id: int) (xmlDoc: XDocument) =
+        task {
+            let name =
+                xmlDoc.XPathSelectElement("//items/item/name[@value]")
+                    .Attribute(XName.Get("value"))
+                    .Value
+                    
+            let! _ =
+                update {
+                    for g in gameTable do
+                    setColumn g.Title (Some name)
+                    where (g.Id = id)
+                } |> conn.UpdateAsync
+            
+            return FetchNextPage(id = id, page = 0)
+        }
+        
+    let fetchPlayPage (id: int) (page: int) =
+        task {
+            let url = $"https://boardgamegeek.com/xmlapi2/plays?id=%d{id}&page=%d{page}"
+    
+            let! xmlResult = downloadXmlAsync url delay
+            
+            match xmlResult with
+            | Some xmlDoc ->
+                return GotPlayPage(id = id, page = page, xmlDoc = xmlDoc)
             | None ->
                 delay <- delay * 2
                 return FetchNextPage(id = id, page = page)
@@ -252,14 +295,24 @@ type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameF
                 | false, _ ->
                     do! Task.Delay 1000
                 | true, j ->
-                    logger.LogDebug("processing job {job}", j)
                     let! newJob =
                         match j with
                         | FetchStart id ->
+                            logger.LogDebug("starting game {id}", id)
                             use conn = dbContext.GetConnection()
                             handleStart conn id
-                        | FetchNextPage(id, page) -> fetchPage id page
-                        | GotPage(id, page, xmlDoc) ->
+                        | FetchGame(id) ->
+                            logger.LogDebug("fetching game {id}", id)
+                            fetchGame id
+                        | GotGame(id, xmlDoc) ->
+                            logger.LogDebug("processing game {id}", id)
+                            use conn = dbContext.GetConnection()
+                            processGame conn id xmlDoc
+                        | FetchNextPage(id, page) ->
+                            logger.LogDebug("fetching game {id} page {page}", id, page)
+                            fetchPlayPage id page
+                        | GotPlayPage(id, page, xmlDoc) ->
+                            logger.LogDebug("processing {id} page {page}", id, page)
                             use conn = dbContext.GetConnection()
                             processPage conn id page xmlDoc
                         | FetchDone -> task { return FetchDone }
