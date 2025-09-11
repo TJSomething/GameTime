@@ -30,7 +30,7 @@ let homeView =
           script [ _src "/js/index.js" ] [] ]
 
 type Listing =
-    static member View
+    static member Render
         (
             id: int,
             status: string,
@@ -50,10 +50,15 @@ type Listing =
                    pre [] [ str percentileTable ] ]
              | "Loading" ->
                  List.concat
-                     [ [ h1 [] [ str title ]; p [] [ str $"Plays: %d{playCount} / %d{totalPlays}" ] ]
+                     [ [ h1 [] [ str title ] ]
+                       (if totalPlays = 0 then
+                            [ p [] [ str "Waiting for game to start loading plays..." ] ]
+                        else
+                            [ p [] [ str $"Loading plays: %d{playCount} / %d{totalPlays}" ] ])
                        (match eta with
-                        | Some t -> [ p [] [ str $"ETA: {t}" ]; article [ _ariaBusy "true" ] [] ]
+                        | Some t -> [ p [] [ str $"ETA: {t}" ] ]
                         | None -> [])
+                       [ article [ _ariaBusy "true" ] [] ]
                        [ script [] [ rawText "setTimeout(() => location.reload(), 10000);" ] ] ]
              | "Initial" ->
                  [ p [] [ str "Loading..." ]

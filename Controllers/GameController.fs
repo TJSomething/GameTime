@@ -70,10 +70,10 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     match game with
                     | None ->
                         // Start in the background
-                        gameFetcher.EnqueueFetch(id)
+                        gameFetcher.EnqueueFetch(id) |> ignore
                         return List.empty
                     | Some g when g.UpdateFinishedAt.IsNone ->
-                        gameFetcher.EnqueueFetch(id)
+                        gameFetcher.EnqueueFetch(id) |> ignore
                         return List.empty
                     | Some _ ->
                         let! ps =
@@ -97,11 +97,16 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                 | Some g ->
                     match (g.Title, g.UpdateStartedAt, g.UpdateFinishedAt) with
                     | (Some t, Some st, None) ->
-                        let timeSpent = DateTime.Now - st
-                        let timePerItem = timeSpent / (float g.FetchedPlays)
-                        let itemsLeft = g.TotalPlays - g.FetchedPlays
-                        let timeLeft = timePerItem * (float itemsLeft)
-                        ("Loading", t, g.FetchedPlays, g.TotalPlays, Some(DateTime.Now + timeLeft))
+                        let eta =
+                            match g.FetchedPlays with
+                            | 0 -> None
+                            | validatedPlays ->
+                                let timeSpent = DateTime.Now - st
+                                let timePerItem = timeSpent / (float validatedPlays)
+                                let itemsLeft = g.TotalPlays - g.FetchedPlays
+                                let timeLeft = timePerItem * (float itemsLeft)
+                                Some(DateTime.Now + timeLeft)
+                        ("Loading", t, g.FetchedPlays, g.TotalPlays, eta)
                     | (Some t, _, Some _) -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
                     | (Some t, None, _) -> ("Loading", t, 0, 0, None)
                     | (None, _, _) -> ("Initial", $"Game #{id}", 0, 0, None)
@@ -110,7 +115,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
 
 
             let view =
-                Listing.View(
+                Listing.Render(
                     id = id,
                     status = status,
                     title = title,
