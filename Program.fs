@@ -39,6 +39,11 @@ module Program =
         app.MapGet("/", Func<IResult>(fun () -> HomeController().Index()))
 
         app.MapGet("/game/{id}", Func<int, GameController, Task<IResult>>(fun id controller -> controller.Listing id))
+        
+        app.MapPost("/game/{id}/refresh", Func<int, GameFetcherService, HttpContext, IResult>(fun id fetcher context ->
+            fetcher.EnqueueFetch(id)
+            context.Response.Headers.Location = $"/game/{id}"
+            Results.StatusCode(303)))
 
         using (app.Services.CreateScope()) (fun scope ->
             use db = scope.ServiceProvider.GetRequiredService<DbContext>()

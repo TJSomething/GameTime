@@ -111,6 +111,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
 
             let view =
                 Listing.View(
+                    id = id,
                     status = status,
                     title = title,
                     playCount = fetchedCount,

@@ -2,6 +2,7 @@ module GameTime.ViewFns
 
 open System
 open Giraffe.ViewEngine
+open Giraffe.ViewEngine.Accessibility
 
 // Components
 let divider = hr [ _class "divider" ]
@@ -14,9 +15,7 @@ let master (titleText: string) (content: XmlNode list) =
               []
               [ meta [ _charset "utf-8" ]
                 title [] [ str titleText ]
-                link
-                    [ _rel "stylesheet"
-                      _href "/css/pico.classless.indigo.min.css" ] ]
+                link [ _rel "stylesheet"; _href "/css/pico.indigo.min.css" ] ]
           body [] [ main [ _class "container" ] content ] ]
 
 // Views
@@ -26,6 +25,7 @@ let homeView =
 type Listing =
     static member View
         (
+            id: int,
             status: string,
             title: string,
             playCount: int,
@@ -34,8 +34,7 @@ type Listing =
             percentileTable: string,
             eta: DateTime option
         ) =
-        master
-            title
+        let statusBody =
             (match status with
              | "Loaded" ->
                  [ h1 [] [ str title ]
@@ -46,10 +45,18 @@ type Listing =
                  List.concat
                      [ [ h1 [] [ str title ]; p [] [ str $"Plays: %d{playCount} / %d{totalPlays}" ] ]
                        (match eta with
-                        | Some t -> [ p [] [ str $"ETA: {t}" ] ]
+                        | Some t -> [ p [] [ str $"ETA: {t}" ]; article [ _ariaBusy "true" ] [] ]
                         | None -> [])
                        [ script [] [ rawText "setTimeout(() => location.reload(), 10000);" ] ] ]
              | "Initial" ->
                  [ p [] [ str "Loading..." ]
+                   article [ _ariaBusy "true" ] []
                    script [] [ rawText "setTimeout(() => location.reload(), 10000);" ] ]
              | _ -> [])
+
+        let forceRefresh =
+            [ form
+                  [ _method "POST"; _action $"/game/{id}/refresh" ]
+                  [ button [ _type "submit"; _class "outline" ] [ str "Force refresh" ] ] ]
+
+        master title (statusBody @ forceRefresh)
