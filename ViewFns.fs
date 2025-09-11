@@ -20,7 +20,14 @@ let master (titleText: string) (content: XmlNode list) =
 
 // Views
 let homeView =
-    master "Homepage" [ h1 [] [ str "Homepage" ]; divider; p [] [ str "Welcome!" ] ]
+    master
+        "GameTime"
+        [ h1 [] [ str "GameTime" ]
+          divider
+          p [] [ str "Search for a board game:" ]
+          input [ _type "text"; _id "search" ]
+          ul [ _id "results" ] []
+          script [ _src "/js/index.js" ] [] ]
 
 type Listing =
     static member View
@@ -59,4 +66,5 @@ type Listing =
                   [ _method "POST"; _action $"/game/{id}/refresh" ]
                   [ button [ _type "submit"; _class "outline" ] [ str "Force refresh" ] ] ]
 
-        master title (statusBody @ forceRefresh)
+        // Em dash
+        master $"{title} \u2014 GameTime" (statusBody @ forceRefresh)
