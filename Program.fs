@@ -6,6 +6,7 @@ open System
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
+open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Primitives
@@ -25,21 +26,32 @@ module Program =
         builder.Services.AddSingleton<GameFetcherService>()
         builder.Services.AddHostedService<GameFetcherService>(_.GetRequiredService<GameFetcherService>())
         builder.Services.AddScoped<GameController>()
+        
+        let config =
+            ConfigurationBuilder()
+                .AddJsonFile("settings.json", optional = true)
+                .AddEnvironmentVariables("GAMETIME_")
+                .Build()
 
         let app = builder.Build()
 
         if not (builder.Environment.IsDevelopment()) then
-            app.UseExceptionHandler("/Home/Error")
             app.UseHsts() |> ignore
-        // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-
+        
         app.UseHttpsRedirection()
+        
+        match config["PathBase"] with
+        | null -> ()
+        | path -> app.UsePathBase(path) |> ignore
 
         app.UseStaticFiles()
 
-        app.MapGet("/", Func<IResult>(fun () -> HomeController().Index()))
+        app.MapGet("/", Func<HttpContext, IResult>(fun context -> HomeController().Index(context.Request.PathBase)))
 
-        app.MapGet("/game/{id}", Func<int, GameController, Task<IResult>>(fun id controller -> controller.Listing id))
+        app.MapGet(
+            "/game/{id}",
+            Func<int, GameController, HttpContext, Task<IResult>>(fun id controller context ->
+                controller.Listing(id = id, pathBase = context.Request.PathBase)))
         
         app.MapPost("/game/{id}/refresh", Func<int, GameFetcherService, HttpContext, IResult>(fun id fetcher context ->
             fetcher.EnqueueFetch(id)

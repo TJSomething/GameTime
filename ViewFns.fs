@@ -8,31 +8,32 @@ open Giraffe.ViewEngine.Accessibility
 let divider = hr [ _class "divider" ]
 
 // Template
-let master (titleText: string) (content: XmlNode list) =
+let master (pathBase: string) (titleText: string) (content: XmlNode list) =
     html
         [ _lang "en" ]
         [ head
               []
               [ meta [ _charset "utf-8" ]
                 title [] [ str titleText ]
-                link [ _rel "stylesheet"; _href "/css/pico.indigo.min.css" ] ]
+                link [ _rel "stylesheet"; _href $"{pathBase}/css/pico.indigo.min.css" ] ]
           body [] [ main [ _class "container" ] content ] ]
 
 // Views
-let homeView =
+let homeView (pathBase: string) =
     master
+        pathBase
         "GameTime"
         [ h1 [] [ str "GameTime" ]
           divider
           p [] [ str "Search for a board game:" ]
           input [ _type "search"; _id "search" ]
           ul [ _id "results" ] []
-          script [ _src "/js/index.js" ] [] ]
+          script [ _src $"{pathBase}/js/index.js" ] [] ]
 
 type Listing =
     static member Render
         (
-            id: int,
+            pathBase: string,
             status: string,
             title: string,
             playCount: int,
@@ -100,4 +101,4 @@ type Listing =
              | _ -> [])
 
         // Em dash
-        master $"{title} \u2014 GameTime" statusBody
+        master pathBase $"{title} \u2014 GameTime" statusBody

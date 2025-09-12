@@ -58,7 +58,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
         }
         |> Seq.toList
 
-    member this.Listing(id: int) =
+    member this.Listing(id: int, pathBase: string) =
         task {
             use conn = dbContext.GetConnection()
 
@@ -132,7 +132,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
 
             let view =
                 Listing.Render(
-                    id = id,
+                    pathBase = pathBase,
                     status = status,
                     title = title,
                     playCount = fetchedCount,

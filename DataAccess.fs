@@ -28,7 +28,7 @@ type DbContext() =
     let conf =
         ConfigurationBuilder()
             .AddJsonFile("settings.json", optional = true)
-            .AddEnvironmentVariables()
+            .AddEnvironmentVariables("GAMETIME_")
             .Build()
 
     let mutable connection: IDbConnection option = None
