@@ -38,7 +38,7 @@ type Listing =
             playCount: int,
             totalPlays: int,
             averagePlayTime: float,
-            percentileTable: string,
+            percentileTable: string list list,
             eta: DateTime option,
             otherGamesAheadOfThisOne: int option
         ) =
@@ -47,8 +47,35 @@ type Listing =
              | "Loaded" ->
                  [ h1 [] [ str title ]
                    p [] [ str $"Plays: {playCount}" ]
-                   p [] [ str $"Average play time: %f{averagePlayTime}" ]
-                   pre [] [ str percentileTable ] ]
+                   p [] [ str $"Average play time: %.0f{averagePlayTime}" ]
+                   h2 [] [ str "Percentiles for play time (minutes)" ]
+                   div
+                       [ _class "overflow-auto" ]
+                       [ table
+                             [ _class "striped" ]
+                             [ thead
+                                   []
+                                   [ tr
+                                         []
+                                         (seq {
+                                             for header in Seq.head percentileTable do
+                                                 yield (th [] [ str header ])
+                                          }
+                                          |> Seq.toList) ]
+                               tbody
+                                   []
+                                   (seq {
+                                       for row in Seq.tail percentileTable do
+                                           yield
+                                               tr
+                                                   []
+                                                   (seq {
+                                                       for cell in row do
+                                                           yield td [] [ str cell ]
+                                                    }
+                                                    |> Seq.toList)
+                                    }
+                                    |> Seq.toList) ] ] ]
              | "Loading" ->
                  List.concat
                      [ [ h1 [] [ str title ] ]

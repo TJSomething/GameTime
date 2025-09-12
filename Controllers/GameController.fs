@@ -12,7 +12,7 @@ open GameTime.DataAccess
 open GameTime.ViewFns
 
 type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
-    let showPercentiles (plays: Play seq) =
+    let makePercentileTable (plays: Play seq) =
         let playerCountToTimes =
             plays
             |> Seq.fold
@@ -28,29 +28,35 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
 
         let ps = [ 0.1..0.1..0.9 ]
 
-        let textChunks =
-            seq {
-                yield " Players |  Plays"
+        seq {
+            // Header row
+            yield
+                seq {
+                    yield "Players"
+                    yield "Plays"
 
-                for p in ps do
-                    yield (sprintf " | %4d%%" (int (p * 100.0)))
+                    for p in ps do
+                        yield (sprintf "%d%%" (int (p * 100.0)))
+                }
+                |> Seq.toList
 
-                yield "\n"
+            // Row for each player count
+            for (playerCount, playTimes) in (playerCountToTimes |> Map.toSeq) do
+                let playCount = playTimes |> Seq.length
+                let sorted = playTimes |> Seq.sort |> Seq.map float
+                let qs = Quantile.computePercentiles (Quantile.OfSorted.compute) ps sorted
 
-                for (playerCount, playTimes) in (playerCountToTimes |> Map.toSeq) do
-                    let playCount = playTimes |> Seq.length
-                    let sorted = playTimes |> Seq.sort |> Seq.map float
-                    let qs = Quantile.computePercentiles (Quantile.OfSorted.compute) ps sorted
+                yield
+                    seq {
+                        yield $"%d{playerCount}"
+                        yield $"%6d{playCount}"
 
-                    yield $" %7d{playerCount} | %6d{playCount}"
-
-                    for q in qs do
-                        yield $" | %5.0f{q}"
-
-                    yield "\n"
-            }
-
-        String.Join("", textChunks)
+                        for q in qs do
+                            yield $"%.0f{q}"
+                    }
+                    |> Seq.toList
+        }
+        |> Seq.toList
 
     member this.Listing(id: int) =
         task {
@@ -64,18 +70,23 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                 |> conn.SelectAsync<Game>
 
             let game = Seq.tryHead gameResult
+            let gameOrder = gameFetcher.GetJobOrder(id)
 
             let! plays =
                 task {
-                    match game with
-                    | None ->
-                        // Start in the background
+                    match (game, gameOrder) with
+                    | (None, _) ->
+                        // Start if no data
                         gameFetcher.EnqueueFetch(id) |> ignore
                         return List.empty
-                    | Some g when g.UpdateFinishedAt.IsNone ->
+                    | (Some g, None) when g.UpdateFinishedAt.IsNone ->
+                        // If there is incomplete data, but no job, then assume that the job failed
                         gameFetcher.EnqueueFetch(id) |> ignore
                         return List.empty
-                    | Some _ ->
+                    | (_, Some _) ->
+                        // Don't start but don't report any plays if a job is in progress
+                        return List.empty
+                    | (Some _, None) ->
                         let! ps =
                             select {
                                 for p in playTable do
@@ -91,8 +102,6 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     plays |> List.averageBy (fun p -> p.Length |> float)
                 else
                     0.0
-
-            let gameOrder = gameFetcher.GetJobOrder(id)
 
             let (status, title, fetchedCount, totalPlays, eta) =
                 match (game, gameOrder) with
@@ -130,7 +139,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     totalPlays = totalPlays,
                     averagePlayTime = average,
                     eta = eta,
-                    percentileTable = showPercentiles plays,
+                    percentileTable = makePercentileTable plays,
                     otherGamesAheadOfThisOne = gameOrder
                 )
 
