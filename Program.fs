@@ -34,17 +34,19 @@ module Program =
                 .Build()
 
         let app = builder.Build()
-
-        if not (builder.Environment.IsDevelopment()) then
-            app.UseHsts() |> ignore
-        
-        app.UseHttpsRedirection()
         
         match config["PathBase"] with
         | null -> ()
         | path -> app.UsePathBase(path) |> ignore
 
+        if not (builder.Environment.IsDevelopment()) then
+            app.UseHsts() |> ignore
+        
+        app.UseHttpsRedirection()
+
         app.UseStaticFiles()
+        
+        app.UseRouting()
 
         app.MapGet("/", Func<HttpContext, IResult>(fun context -> HomeController().Index(context.Request.PathBase)))
 
