@@ -48,7 +48,7 @@ type Listing =
             playCount: int,
             totalPlays: int,
             averagePlayTime: float,
-            percentileTable: string list list,
+            percentileTable: string array array,
             timeLeft: TimeSpan option,
             otherGamesAheadOfThisOne: int option
         ) =

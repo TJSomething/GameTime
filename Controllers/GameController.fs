@@ -2,8 +2,10 @@ namespace GameTime.Controllers
 
 open System
 
+open System.Data
 open GameTime.Services
 open Microsoft.AspNetCore.Http
+open Microsoft.Extensions.Caching.Memory
 
 open Dapper.FSharp.SQLite
 open FSharp.Stats
@@ -11,7 +13,34 @@ open FSharp.Stats
 open GameTime.DataAccess
 open GameTime.ViewFns
 
-type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
+type private CachedGameStats =
+    { ModifiedAt: DateTime
+      PercentileTable: string[][]
+      Average: float }
+
+    member this.GetCacheSize() =
+        let tableSize =
+            // Array has 3 pointers of overhead
+            3 * IntPtr.Size
+            + (this.PercentileTable
+               |> Array.fold
+                   (fun acc row ->
+                       acc
+                       + 3 * IntPtr.Size
+                       + (row
+                          |> Array.fold
+                              // Strings are UTF-16 with 2 bytes of overhead
+                              (fun innerAcc (cell: string) -> innerAcc + IntPtr.Size * 3 + 2 + cell.Length * 2)
+                              0))
+                   0)
+
+        // This object has 3 pointers of overhead
+        // DateTime is a struct of two longs
+        // Average is a double precision float
+        3 * IntPtr.Size + 16 + 8 + tableSize
+
+type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache: IMemoryCache) =
+
     let makePercentileTable (plays: Play seq) =
         let playerCountToTimes =
             plays
@@ -38,7 +67,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     for p in ps do
                         yield (sprintf "%d%%" (int (p * 100.0)))
                 }
-                |> Seq.toList
+                |> Seq.toArray
 
             // Row for each player count
             for (playerCount, playTimes) in (playerCountToTimes |> Map.toSeq) do
@@ -49,14 +78,59 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                 yield
                     seq {
                         yield $"%d{playerCount}"
-                        yield $"%6d{playCount}"
+                        yield $"%d{playCount}"
 
                         for q in qs do
                             yield $"%.0f{q}"
                     }
-                    |> Seq.toList
+                    |> Seq.toArray
         }
-        |> Seq.toList
+        |> Seq.toArray
+
+    let getOrMakeGameStats (conn: IDbConnection) (id: int) (gameModifiedDateTime: DateTime) =
+        task {
+            let key = $"game-stats-{id}"
+
+            let create () =
+                task {
+                    let! plays =
+                        select {
+                            for p in playTable do
+                                where (p.GameId = id)
+                        }
+                        |> conn.SelectAsync<Play>
+
+                    let average =
+                        if Seq.length plays > 0 then
+                            plays |> Seq.averageBy (fun p -> p.Length |> float)
+                        else
+                            0.0
+
+                    return
+                        { ModifiedAt = gameModifiedDateTime
+                          PercentileTable = makePercentileTable plays
+                          Average = average }
+                }
+
+            let! cached =
+                cache.GetOrCreateAsync(
+                    key,
+                    (fun cacheItem ->
+                        task {
+                            let! result = create ()
+                            cacheItem.Size <- result.GetCacheSize()
+                            cacheItem.SlidingExpiration <- TimeSpan.FromDays(7)
+                            return result
+                        })
+                )
+
+            // Reset cache entry if we have newer data
+            if cached.ModifiedAt < gameModifiedDateTime then
+                let! newStats = create ()
+                return cache.Set(key, newStats)
+            else
+                return cached
+        }
 
     member this.Listing(id: int, pathBase: string) =
         task {
@@ -72,36 +146,24 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
             let game = Seq.tryHead gameResult
             let gameOrder = gameFetcher.GetJobOrder(id)
 
-            let! plays =
+            let! (percentileTable, average) =
                 task {
                     match (game, gameOrder) with
                     | (None, _) ->
                         // Start if no data
                         gameFetcher.EnqueueFetch(id) |> ignore
-                        return List.empty
+                        return (Array.empty, 0.0)
                     | (Some g, None) when g.UpdateFinishedAt.IsNone ->
                         // If there is incomplete data, but no job, then assume that the job failed
                         gameFetcher.EnqueueFetch(id) |> ignore
-                        return List.empty
+                        return (Array.empty, 0.0)
                     | (_, Some _) ->
                         // Don't start but don't report any plays if a job is in progress
-                        return List.empty
-                    | (Some _, None) ->
-                        let! ps =
-                            select {
-                                for p in playTable do
-                                    where (p.GameId = id)
-                            }
-                            |> conn.SelectAsync<Play>
-
-                        return Seq.toList ps
+                        return (Array.empty, 0.0)
+                    | (Some g, None) ->
+                        let! result = getOrMakeGameStats conn id g.UpdateTouchedAt
+                        return (result.PercentileTable, result.Average)
                 }
-
-            let average =
-                if List.length plays > 0 then
-                    plays |> List.averageBy (fun p -> p.Length |> float)
-                else
-                    0.0
 
             let (status, title, fetchedCount, totalPlays, timeLeft) =
                 match (game, gameOrder) with
@@ -139,7 +201,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     totalPlays = totalPlays,
                     averagePlayTime = average,
                     timeLeft = timeLeft,
-                    percentileTable = makePercentileTable plays,
+                    percentileTable = percentileTable,
                     otherGamesAheadOfThisOne = gameOrder
                 )
 
