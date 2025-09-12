@@ -78,7 +78,6 @@ type PlayFetchProcessor(
                     GameId = gameId
                     Length = validTime
                     PlayerCount = playerCount
-                    FetchedAt = DateTime.Now
                 }))
         
         

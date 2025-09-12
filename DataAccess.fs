@@ -21,8 +21,7 @@ type Play =
     { Id: int
       GameId: int
       Length: int
-      PlayerCount: int
-      FetchedAt: DateTime }
+      PlayerCount: int }
 
 type DbContext() =
     let conf =
@@ -101,6 +100,21 @@ module private Internal =
             return ()
         }
 
+    let migratePlay1 (conn: IDbConnection) =
+        task {
+            let! results =
+                """select name from pragma_table_xinfo('Play') where name = 'FetchedAt'"""
+                |> conn.QueryAsync
+
+            let count = results.AsList().Count
+
+            if count > 0 then
+                let! _ = """alter table Play drop column FetchedAt""" |> conn.ExecuteAsync
+                ()
+
+            return ()
+        }
+
 let safeInit (conn: IDbConnection) =
     task {
         if Internal.isAlreadyInitialized |> not then
@@ -108,6 +122,7 @@ let safeInit (conn: IDbConnection) =
             let! _ = "PRAGMA foreign_keys = ON;" |> conn.ExecuteAsync
             do! Internal.initGame conn
             do! Internal.initPlay conn
+            do! Internal.migratePlay1 conn
             Internal.isAlreadyInitialized <- true
             OptionTypes.register ()
     }
