@@ -124,9 +124,10 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     | (None, _, _) -> ("Initial", $"Game #{id}", 0, 0, None)
 
                 | (Some g, None) ->
-                    match g.Title with
-                    | Some t -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
-                    | None -> ("Initial", $"Game #{id}", 0, 0, None)
+                    match (g.Title, g.UpdateFinishedAt) with
+                    | (Some t, Some _) -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
+                    | (None, _)
+                    | (_, None) -> ("Initial", $"Game #{id}", 0, 0, None)
                 | (_, None)
                 | (None, _) -> ("Initial", $"Game #{id}", 0, 0, None)
 
