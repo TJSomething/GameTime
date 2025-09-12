@@ -103,7 +103,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                 else
                     0.0
 
-            let (status, title, fetchedCount, totalPlays, eta) =
+            let (status, title, fetchedCount, totalPlays, timeLeft) =
                 match (game, gameOrder) with
                 | (Some g, Some _) ->
                     match (g.Title, g.UpdateStartedAt, g.UpdateFinishedAt) with
@@ -115,8 +115,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                                 let timeSpent = DateTime.Now - st
                                 let timePerItem = timeSpent / (float validatedPlays)
                                 let itemsLeft = g.TotalPlays - g.FetchedPlays
-                                let timeLeft = timePerItem * (float itemsLeft)
-                                Some(DateTime.Now + timeLeft)
+                                Some(timePerItem * (float itemsLeft))
 
                         ("Loading", t, g.FetchedPlays, g.TotalPlays, eta)
                     | (Some t, _, Some _) -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
@@ -139,7 +138,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     playCount = fetchedCount,
                     totalPlays = totalPlays,
                     averagePlayTime = average,
-                    eta = eta,
+                    timeLeft = timeLeft,
                     percentileTable = makePercentileTable plays,
                     otherGamesAheadOfThisOne = gameOrder
                 )

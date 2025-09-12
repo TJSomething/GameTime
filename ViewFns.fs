@@ -3,6 +3,7 @@ module GameTime.ViewFns
 open System
 open Giraffe.ViewEngine
 open Giraffe.ViewEngine.Accessibility
+open Humanizer
 
 // Components
 let divider = hr [ _class "divider" ]
@@ -48,7 +49,7 @@ type Listing =
             totalPlays: int,
             averagePlayTime: float,
             percentileTable: string list list,
-            eta: DateTime option,
+            timeLeft: TimeSpan option,
             otherGamesAheadOfThisOne: int option
         ) =
         let statusBody =
@@ -97,10 +98,10 @@ type Listing =
                         | None
                         | Some 0 -> []
                         | Some count -> [ p [] [ str $"There are {count} games ahead of this one." ] ])
-                       (match eta with
-                        | Some t -> [ p [] [ str $"ETA: {t}" ] ]
+                       (match timeLeft with
+                        | Some t -> [ p [] [ str $"Time left: {t.Humanize(precision = 2)}" ] ]
                         | None -> [])
-                       [ article [ _ariaBusy "true" ] [] ]
+                       [ progress [ _value $"{playCount}"; _max $"{totalPlays}" ] [] ]
                        [ script [] [ rawText "setTimeout(() => location.reload(), 10000);" ] ] ]
              | "Initial" ->
                  [ p [] [ str "Loading..." ]
