@@ -14,18 +14,26 @@ let master (pathBase: string) (titleText: string) (content: XmlNode list) =
         [ head
               []
               [ meta [ _charset "utf-8" ]
+                meta [ _name "viewport"; _content "width=device-width, initial-scale=1" ]
+                meta [ _name "color-schema"; _content "light dark" ]
                 title [] [ str titleText ]
                 link [ _rel "stylesheet"; _href $"{pathBase}/css/pico.indigo.min.css" ] ]
-          body [] [ main [ _class "container" ] content ] ]
+          body
+              []
+              [ header
+                    [ _class "container" ]
+                    [ nav
+                          []
+                          [ ul [] [ li [] [ strong [] [ str "GameTime" ] ] ]
+                            ul [] [ li [] [ a [ _href $"{pathBase}/" ] [ str "Home" ] ] ] ] ]
+                main [ _class "container" ] content ] ]
 
 // Views
 let homeView (pathBase: string) =
     master
         pathBase
         "GameTime"
-        [ h1 [] [ str "GameTime" ]
-          divider
-          p [] [ str "Search for a board game:" ]
+        [ p [] [ str "Search for a board game:" ]
           input [ _type "search"; _id "search" ]
           ul [ _id "results" ] []
           script [ _src $"{pathBase}/js/index.js" ] [] ]
