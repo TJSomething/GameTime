@@ -27,17 +27,16 @@ module Program =
         builder.Services.AddHostedService<GameFetcherService>(_.GetRequiredService<GameFetcherService>())
         builder.Services.AddScoped<GameController>()
         
-        let config =
+        let pathBase =
             ConfigurationBuilder()
                 .AddJsonFile("settings.json", optional = true)
                 .AddEnvironmentVariables("GAMETIME_")
                 .Build()
+                .["PathBase"]
+            |> Option.ofObj
+            |> Option.defaultValue ""
 
         let app = builder.Build()
-        
-        match config["PathBase"] with
-        | null -> ()
-        | path -> app.UsePathBase(path) |> ignore
 
         if not (builder.Environment.IsDevelopment()) then
             app.UseHsts() |> ignore
@@ -46,18 +45,16 @@ module Program =
 
         app.UseStaticFiles()
         
-        app.UseRouting()
-
-        app.MapGet("/", Func<HttpContext, IResult>(fun context -> HomeController().Index(context.Request.PathBase)))
+        app.MapGet("/", Func<HttpContext, IResult>(fun context -> HomeController().Index(pathBase)))
 
         app.MapGet(
             "/game/{id}",
             Func<int, GameController, HttpContext, Task<IResult>>(fun id controller context ->
-                controller.Listing(id = id, pathBase = context.Request.PathBase)))
+                controller.Listing(id = id, pathBase = pathBase)))
         
         app.MapPost("/game/{id}/refresh", Func<int, GameFetcherService, HttpContext, IResult>(fun id fetcher context ->
             fetcher.EnqueueFetch(id)
-            context.Response.Headers.Location = StringValues($"/game/{id}")
+            context.Response.Headers.Location = StringValues($"{pathBase}/game/{id}")
             Results.StatusCode(303)))
 
         using (app.Services.CreateScope()) (fun scope ->
