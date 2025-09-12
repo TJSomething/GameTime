@@ -107,7 +107,7 @@
         for (const item of items.slice(0, 100)) {
             const elem = document.createElement("li");
             const link = document.createElement("a");
-            link.href = `/game/${item.id|0}`;
+            link.href = `game/${item.id|0}`;
             link.appendChild(document.createTextNode(item.name));
             elem.appendChild(link);
             results.appendChild(elem);
