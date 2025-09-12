@@ -42,5 +42,6 @@
 
     <ItemGroup>
       <Folder Include="wwwroot\css\" />
+      <Content Include="LICENSE" />
     </ItemGroup>
 </Project>
