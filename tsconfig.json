@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "lib": ["DOM", "ES2021"]
+  },
+  "include": [
+    "wwwroot/js/**/*"
+  ]
+}

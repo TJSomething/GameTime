@@ -1,9 +1,21 @@
+// @ts-check
+
 (() => {
     const search = document.getElementById("search");
     const results = document.getElementById("results");
+    
+    if (!(results instanceof HTMLUListElement) || !(search instanceof HTMLInputElement)) return;
+    
+    /**
+     * @type {number | undefined}
+     */
     let debounceTimer;
     let latestJobTime = 0;
 
+    /**
+     * @param {() => void} action
+     * @param {number} time
+     */
     const debounce = (action, time) => {
         if (debounceTimer) {
             clearTimeout(debounceTimer);
@@ -16,10 +28,39 @@
             debounceTimer = undefined;
         }, time);
     };
+    
+    /** @typedef {{id: string, name: string, year: string|null}} Game */
 
     /**
-     * @param params {{query: string, exact: boolean|undefined}}
-     * @returns {Promise<{id: string, name: string}[]>}
+     * @param {string} rawXml
+     * @returns {Game[]}
+     */
+    function extractGames(rawXml) {
+        const parser = new DOMParser();
+        const parsedXml = parser.parseFromString(rawXml, "text/xml");
+
+        const itemNodes = Array.from(parsedXml.getElementsByTagName("item"));
+
+        return itemNodes.flatMap(node => {
+            let id = node.getAttribute("id");
+            let name = node.getElementsByTagName("name")[0]?.getAttribute("value");
+            let year = node.getElementsByTagName("yearpublished")[0]?.getAttribute("value") ?? null;
+
+            if (!id || !name) {
+                return [];
+            }
+
+            return ([{
+                id,
+                name,
+                year,
+            }]);
+        });
+    }
+
+    /**
+     * @param params {{query: string, exact?: boolean}}
+     * @returns {Promise<Game[]>}
      */
     const searchForGame = async (params) => {
         const url = new URL("https://boardgamegeek.com/xmlapi2/search?type=boardgame");
@@ -30,32 +71,23 @@
 
         const resp = await fetch(url);
         const rawXml = await resp.text();
-        const parser = new DOMParser();
-        const parsedXml = parser.parseFromString(rawXml, "text/xml");
-
-        const itemNodes = Array.from(parsedXml.getElementsByTagName("item"));
-
-        return itemNodes.map(node => ({
-            id: node.getAttribute("id"),
-            name: node.getElementsByTagName("name")[0].getAttribute("value"),
-        }));
+        
+        return extractGames(rawXml);
     }
-    
+
+    /**
+     * 
+     * @param {string} id
+     * @returns {Promise<Game[]>}
+     */
     const getGameById = async (id) => {
         const url = new URL("https://boardgamegeek.com/xmlapi2/thing?type=boardgame");
         url.searchParams.set("id", id);
 
         const resp = await fetch(url);
         const rawXml = await resp.text();
-        const parser = new DOMParser();
-        const parsedXml = parser.parseFromString(rawXml, "text/xml");
-
-        const itemNodes = Array.from(parsedXml.getElementsByTagName("item"));
-
-        return itemNodes.map(node => ({
-            id: node.getAttribute("id"),
-            name: node.getElementsByTagName("name")[0].getAttribute("value"),
-        }));
+        
+        return extractGames(rawXml);
     }
 
     const onSearch = async () => {
@@ -107,8 +139,8 @@
         for (const item of items.slice(0, 100)) {
             const elem = document.createElement("li");
             const link = document.createElement("a");
-            link.href = `game/${item.id|0}`;
-            link.appendChild(document.createTextNode(item.name));
+            link.href = `game/${Number(item.id)}`;
+            link.appendChild(document.createTextNode(`${item.name} (${item.year})`));
             elem.appendChild(link);
             results.appendChild(elem);
         }
