@@ -39,6 +39,7 @@
     
     <ItemGroup>
         <TrimmerRootAssembly Include="FSharp.Core" />
+        <TrimmerRootAssembly Include="Dapper.FSharp" />
     </ItemGroup>
 
     <ItemGroup>
