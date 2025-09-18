@@ -2,8 +2,9 @@
 
 open Microsoft.AspNetCore.Http
 
-open Dapper.FSharp.SQLite
 open Giraffe.ViewEngine
+// This can't be opened before Giraffe for some reason
+open Dapper.FSharp.SQLite
 
 open GameTime.ViewFns
 open GameTime.DataAccess
