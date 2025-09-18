@@ -194,6 +194,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
 
             let view =
                 Listing.Render(
+                    id = id,
                     pathBase = pathBase,
                     status = status,
                     title = title,

@@ -50,6 +50,7 @@ let homeView (pathBase: string) (recentGames: Game seq) =
 type Listing =
     static member Render
         (
+            id: int,
             pathBase: string,
             status: string,
             title: string,
@@ -64,6 +65,7 @@ type Listing =
             (match status with
              | "Loaded" ->
                  [ h1 [] [ str title ]
+                   p [] [ a [ _href $"https://boardgamegeek.com/boardgame/{id}/" ] [ str "BGG page" ] ]
                    p [] [ str $"Plays: {playCount}" ]
                    p [] [ str $"Average play time: %.0f{averagePlayTime}" ]
                    h2 [] [ str "Percentiles for play time (minutes)" ]
