@@ -38,6 +38,7 @@ module Program =
                     |> Nullable))
         builder.Services.AddSingleton<GameFetcherService>()
         builder.Services.AddHostedService<GameFetcherService>(_.GetRequiredService<GameFetcherService>())
+        builder.Services.AddScoped<HomeController>()
         builder.Services.AddScoped<GameController>()
 
         let pathBase =
@@ -54,7 +55,7 @@ module Program =
 
         app.UseStaticFiles()
         
-        app.MapGet("/", Func<HttpContext, IResult>(fun context -> HomeController().Index(pathBase)))
+        app.MapGet("/", Func<HomeController, Task<IResult>>(_.Index(pathBase)))
 
         app.MapGet(
             "/game/{id}",

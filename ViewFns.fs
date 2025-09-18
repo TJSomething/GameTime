@@ -1,6 +1,7 @@
 module GameTime.ViewFns
 
 open System
+open GameTime.DataAccess
 open Giraffe.ViewEngine
 open Giraffe.ViewEngine.Accessibility
 open Humanizer
@@ -30,13 +31,20 @@ let master (pathBase: string) (titleText: string) (content: XmlNode list) =
                 main [ _class "container" ] content ] ]
 
 // Views
-let homeView (pathBase: string) =
+let homeView (pathBase: string) (recentGames: Game seq) =
     master
         pathBase
         "GameTime"
         [ p [] [ str "Search for a board game:" ]
           input [ _type "search"; _id "search" ]
           ul [ _id "results" ] []
+          h2 [] [ str "Recently loaded games" ]
+          ul
+              []
+              (recentGames
+               |> Seq.map (fun g ->
+                   li [] [ a [ _href $"game/{g.Id}" ] [ g.Title |> Option.defaultValue $"Game #{g.Id}" |> str ] ])
+               |> Seq.toList)
           script [ _src $"{pathBase}/js/index.js" ] [] ]
 
 type Listing =
