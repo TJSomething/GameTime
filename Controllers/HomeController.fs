@@ -3,11 +3,12 @@
 open Microsoft.AspNetCore.Http
 
 open Giraffe.ViewEngine
-// This can't be opened before Giraffe for some reason
-open Dapper.FSharp.SQLite
 
 open GameTime.ViewFns
 open GameTime.DataAccess
+
+// This can't be opened before DataAccess or the app crashes
+open Dapper.FSharp.SQLite
 
 type HomeController(dbContext: DbContext) =
     member this.Index(pathBase: string) =
