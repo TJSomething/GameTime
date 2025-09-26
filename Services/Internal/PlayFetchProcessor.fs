@@ -95,12 +95,16 @@ type PlayFetchProcessor(
             
             if pagePlayCount = 0 then
                 let! _ =
-                    update {
-                        for g in gameTable do
-                        setColumn g.UpdateFinishedAt (Some DateTime.Now)
-                        setColumn g.UpdateTouchedAt DateTime.Now
-                        where (g.Id = id)
-                    } |> conn.UpdateAsync
+                    conn.ExecuteAsync(
+                        """
+                        update Game
+                        set UpdateTouchedAt = @now,
+                            UpdateStartedAt = coalesce(UpdateStartedAt, @now),
+                            UpdateFinishedAt = @now
+                        where id = @id
+                        """,
+                        {| now = DateTime.Now
+                           id = id |})
                     
                 return FetchDone
             else

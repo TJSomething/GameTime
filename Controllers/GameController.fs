@@ -187,7 +187,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
                 | (Some g, None) ->
                     match (g.Title, g.UpdateFinishedAt) with
                     | (Some t, Some _) -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
-                    | (None, _)
+                    | (None, Some _) -> ("Loaded", "Game not found", g.FetchedPlays, g.TotalPlays, None)
                     | (_, None) -> ("Initial", $"Game #{id}", 0, 0, None)
                 | (_, None)
                 | (None, _) -> ("Initial", $"Game #{id}", 0, 0, None)

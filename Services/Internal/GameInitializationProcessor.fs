@@ -83,15 +83,19 @@ type GameInitializationProcessor
     let writeGameInfo (conn: IDbConnection) (id: int) (xmlDoc: XDocument) =
         task {
             let name =
-                xmlDoc.XPathSelectElement("//items/item/name[@value]").Attribute(
-                    XName.Get("value")
-                )
-                    .Value
+                xmlDoc
+                |> Option.ofObj
+                |> Option.map _.XPathSelectElement("//items/item/name[@value]")
+                |> Option.bind Option.ofObj
+                |> Option.map _.Attribute(XName.Get("value"))
+                |> Option.bind Option.ofObj
+                |> Option.map _.Value
+                |> Option.bind Option.ofObj
 
             let! _ =
                 update {
                     for g in gameTable do
-                        setColumn g.Title (Some name)
+                        setColumn g.Title name
                         where (g.Id = id)
                 }
                 |> conn.UpdateAsync
