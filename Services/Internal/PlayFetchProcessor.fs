@@ -1,18 +1,16 @@
 namespace GameTime.Services.Internal
 
 open System
-open System.Collections.Concurrent
-open System.Data
 open System.Threading
 open System.Threading.Channels
 open System.Xml.Linq
 
+open GameTime.Data
+open GameTime.Data.Entities
 open Microsoft.Extensions.DependencyInjection
 
 open Dapper
 open Dapper.FSharp.SQLite
-
-open GameTime.DataAccess
 
 type private PlayStatus =
     | FetchNextPage
@@ -55,6 +53,11 @@ type PlayFetchProcessor(
                 |> Seq.head
                 |> _.Attribute(XName.Get("objectid")).Value
                 |> int
+            
+            let userIdOpt =
+                play.Attribute("userid").Value
+                |> Option.ofObj
+                |> Option.map int
 
             let time =
                 play.Attribute(XName.Get("length")).Value
@@ -69,13 +72,15 @@ type PlayFetchProcessor(
 
             let playerCount = playerCountOpt |> Option.defaultValue 0
 
-            match (id, time) with
-            | _, 0 -> Seq.empty
-            | None, _ -> Seq.empty
-            | Some validId, validTime ->
+            match (id, time, userIdOpt) with
+            | None, _, _
+            | _, 0, _
+            | _, _, None -> Seq.empty
+            | Some validId, validTime, Some validUserId ->
                 Seq.singleton (gameTitle, {
                     Id = validId
                     GameId = gameId
+                    //UserId = validUserId
                     Length = validTime
                     PlayerCount = playerCount
                 }))
@@ -89,13 +94,13 @@ type PlayFetchProcessor(
             return! fetcher.downloadXmlAsync url
         }
     
-    let writePlayPage (conn: IDbConnection) (id: int) (xmlDoc: XDocument) =
+    let writePlayPage (db: DbContext) (id: int) (xmlDoc: XDocument) =
         task {
             let pagePlayCount = getPagePlayCount xmlDoc
             
             if pagePlayCount = 0 then
                 let! _ =
-                    conn.ExecuteAsync(
+                    db.GetConnection().ExecuteAsync(
                         """
                         update Game
                         set UpdateTouchedAt = @now,
@@ -118,7 +123,7 @@ type PlayFetchProcessor(
                 let total = getPlayTotal xmlDoc
                 
                 let! _ =
-                    conn.ExecuteAsync(
+                    db.GetConnection().ExecuteAsync(
                         """
                         update Game
                         set FetchedPlays = FetchedPlays + @pagePlayCount,
@@ -142,9 +147,9 @@ type PlayFetchProcessor(
                 if List.length plays > 0 then
                     let! _ =
                         insert {
-                            into playTable
+                            into db.PlayTable
                             values plays
-                        } |> conn.InsertOrReplaceAsync
+                        } |> db.GetConnection().InsertOrReplaceAsync
                     ()
                     
                 return FetchNextPage
@@ -164,10 +169,8 @@ type PlayFetchProcessor(
                     
                     try
                         while (not stoppingToken.IsCancellationRequested && status <> FetchDone) do
-                            use conn = dbContext.GetConnection()
-                            
                             let! playXml = fetchPlayPage id page
-                            let! newStatus = writePlayPage conn id playXml
+                            let! newStatus = writePlayPage dbContext id playXml
                             page <- page + 1
                             status <- newStatus
                     finally

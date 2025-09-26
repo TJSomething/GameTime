@@ -19,10 +19,10 @@ type ActiveJobTracker() =
     member this.CloseJob(id: int) =
         lock this (fun () ->
             match jobIdToOrderNumber.TryGetValue(id) with
-            | (true, order) ->
+            | true, order ->
                 activeOrderNumbers.Remove(order) |> ignore
                 jobIdToOrderNumber.Remove(id)
-            | (false, _) -> false)
+            | false, _ -> false)
 
     /// <summary>
     /// Gets the number of jobs ahead of the given ID
@@ -32,5 +32,5 @@ type ActiveJobTracker() =
     member this.GetJobOrder(id: int) =
         lock this (fun () ->
             match jobIdToOrderNumber.TryGetValue(id) with
-            | (true, order) -> Some(order - activeOrderNumbers.Min)
-            | (false, _) -> None)
+            | true, order -> Some(order - activeOrderNumbers.Min)
+            | false, _ -> None)

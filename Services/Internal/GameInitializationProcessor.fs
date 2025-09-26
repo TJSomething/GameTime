@@ -1,18 +1,16 @@
 namespace GameTime.Services.Internal
 
 open System
-open System.Collections.Concurrent
-open System.Data
 open System.Threading
 open System.Threading.Channels
 open System.Xml.Linq
 open System.Xml.XPath
 
+open GameTime.Data
+open GameTime.Data.Entities
 open Microsoft.Extensions.DependencyInjection
 
 open Dapper.FSharp.SQLite
-
-open GameTime.DataAccess
 
 type GameInitializationProcessor
     (
@@ -23,21 +21,20 @@ type GameInitializationProcessor
     ) =
     let jobQueue: int Channel = Channel.CreateUnbounded()
 
-    let initializeJob (conn: IDbConnection) (id: int) =
+    let initializeJob (db: DbContext) (id: int) =
         task {
             let! gameResult =
                 select {
-                    for g in gameTable do
+                    for g in db.GameTable do
                         where (g.Id = id)
                 }
-                |> conn.SelectAsync<Game>
+                |> db.GetConnection().SelectAsync<Game>
 
             match Seq.tryHead gameResult with
             | None ->
                 let! _ =
                     insert {
-                        into gameTable
-
+                        into db.GameTable
                         value
                             { Id = id
                               AddedAt = DateTime.Now
@@ -47,28 +44,36 @@ type GameInitializationProcessor
                               UpdateFinishedAt = None
                               UpdateTouchedAt = DateTime.Now
                               UpdateStartedAt = None }
+                              //YearPublished = None
+                              //BoxMinPlayTime = None
+                              //BoxPlayTime = None
+                              //BoxMaxPlayTime = None
+                              //BoxMinPlayers = None
+                              //BoxMaxPlayers = None
+                              //UpdateStatus = None
+                              //UpdateVersion = 2
                     }
-                    |> conn.InsertAsync
+                    |> db.GetConnection().InsertAsync
 
                 return ()
             | Some _ ->
                 let! _ =
                     update {
-                        for g in gameTable do
+                        for g in db.GameTable do
                             setColumn g.UpdateStartedAt (Some DateTime.Now)
                             setColumn g.UpdateTouchedAt DateTime.Now
                             setColumn g.FetchedPlays 0
                             setColumn g.TotalPlays 0
                             where (g.Id = id)
                     }
-                    |> conn.UpdateAsync
+                    |> db.GetConnection().UpdateAsync
 
                 let! _ =
                     delete {
-                        for p in playTable do
+                        for p in db.PlayTable do
                             where (p.GameId = id)
                     }
-                    |> conn.DeleteAsync
+                    |> db.GetConnection().DeleteAsync
 
                 return ()
         }
@@ -80,7 +85,7 @@ type GameInitializationProcessor
             return! fetcher.downloadXmlAsync url
         }
 
-    let writeGameInfo (conn: IDbConnection) (id: int) (xmlDoc: XDocument) =
+    let writeGameInfo (db: DbContext) (id: int) (xmlDoc: XDocument) =
         task {
             let name =
                 xmlDoc
@@ -94,11 +99,11 @@ type GameInitializationProcessor
 
             let! _ =
                 update {
-                    for g in gameTable do
+                    for g in db.GameTable do
                         setColumn g.Title name
                         where (g.Id = id)
                 }
-                |> conn.UpdateAsync
+                |> db.GetConnection().UpdateAsync
 
             ()
         }
@@ -112,13 +117,12 @@ type GameInitializationProcessor
                     use dbContext = scope.ServiceProvider.GetRequiredService<DbContext>()
 
                     let! id = jobQueue.Reader.ReadAsync(stoppingToken)
-                    use conn = dbContext.GetConnection()
 
                     if jobTracker.StartJob(id) then
                         try
-                            do! initializeJob conn id
+                            do! initializeJob dbContext id
                             let! gameXml = fetchGame id
-                            do! writeGameInfo conn id gameXml
+                            do! writeGameInfo dbContext id gameXml
                         with ex ->
                             jobTracker.CloseJob(id) |> ignore
                             raise (Exception($"Error in fetching game {id}", ex))

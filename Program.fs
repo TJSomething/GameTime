@@ -4,6 +4,8 @@ namespace GameTime
 
 open System
 open System.Threading.Tasks
+open GameTime.Data
+open GameTime.Data.Migrations
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Configuration
@@ -12,7 +14,6 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Primitives
 
 open GameTime.Controllers
-open GameTime.DataAccess
 open GameTime.Services
 
 module Program =

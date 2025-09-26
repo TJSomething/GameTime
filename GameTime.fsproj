@@ -17,15 +17,17 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="DataAccess.fs" />
+        <Compile Include="Data\Entities.fs" />
+        <Compile Include="Data\Migrations.fs" />
+        <Compile Include="Data\DbContext.fs" />
         <Compile Include="ViewFns.fs" />
         <Compile Include="Services\Internal\XmlFetcher.fs" />
         <Compile Include="Services\Internal\ActiveJobTracker.fs" />
         <Compile Include="Services\Internal\PlayFetchProcessor.fs" />
         <Compile Include="Services\Internal\GameInitializationProcessor.fs" />
         <Compile Include="Services\GameFetcherService.fs" />
-        <Compile Include="Controllers\HomeController.fs" />
         <Compile Include="Controllers\GameController.fs" />
+        <Compile Include="Controllers\HomeController.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 

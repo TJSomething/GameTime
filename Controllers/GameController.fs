@@ -2,7 +2,8 @@ namespace GameTime.Controllers
 
 open System
 
-open System.Data
+open GameTime.Data
+open GameTime.Data.Entities
 open GameTime.Services
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.Caching.Memory
@@ -10,7 +11,6 @@ open Microsoft.Extensions.Caching.Memory
 open Dapper.FSharp.SQLite
 open FSharp.Stats
 
-open GameTime.DataAccess
 open GameTime.ViewFns
 
 type private CachedGameStats =
@@ -70,10 +70,10 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
                 |> Seq.toArray
 
             // Row for each player count
-            for (playerCount, playTimes) in (playerCountToTimes |> Map.toSeq) do
+            for playerCount, playTimes in (playerCountToTimes |> Map.toSeq) do
                 let playCount = playTimes |> Seq.length
                 let sorted = playTimes |> Seq.sort |> Seq.map float
-                let qs = Quantile.computePercentiles (Quantile.OfSorted.compute) ps sorted
+                let qs = Quantile.computePercentiles Quantile.OfSorted.compute ps sorted
 
                 yield
                     seq {
@@ -87,7 +87,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
         }
         |> Seq.toArray
 
-    let getOrMakeGameStats (conn: IDbConnection) (id: int) (gameModifiedDateTime: DateTime) =
+    let getOrMakeGameStats (db: DbContext) (id: int) (gameModifiedDateTime: DateTime) =
         task {
             let key = $"game-stats-{id}"
 
@@ -95,10 +95,10 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
                 task {
                     let! plays =
                         select {
-                            for p in playTable do
+                            for p in db.PlayTable do
                                 where (p.GameId = id)
                         }
-                        |> conn.SelectAsync<Play>
+                        |> db.GetConnection().SelectAsync<Play>
 
                     let average =
                         if Seq.length plays > 0 then
@@ -138,7 +138,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
 
             let! gameResult =
                 select {
-                    for g in gameTable do
+                    for g in dbContext.GameTable do
                         where (g.Id = id)
                 }
                 |> conn.SelectAsync<Game>
@@ -146,30 +146,30 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
             let game = Seq.tryHead gameResult
             let gameOrder = gameFetcher.GetJobOrder(id)
 
-            let! (percentileTable, average) =
+            let! percentileTable, average =
                 task {
                     match (game, gameOrder) with
-                    | (None, _) ->
+                    | None, _ ->
                         // Start if no data
-                        gameFetcher.EnqueueFetch(id) |> ignore
+                        gameFetcher.EnqueueFetch(id)
                         return (Array.empty, 0.0)
-                    | (Some g, None) when g.UpdateFinishedAt.IsNone ->
+                    | Some g, None when g.UpdateFinishedAt.IsNone ->
                         // If there is incomplete data, but no job, then assume that the job failed
-                        gameFetcher.EnqueueFetch(id) |> ignore
+                        gameFetcher.EnqueueFetch(id)
                         return (Array.empty, 0.0)
-                    | (_, Some _) ->
+                    | _, Some _ ->
                         // Don't start but don't report any plays if a job is in progress
                         return (Array.empty, 0.0)
-                    | (Some g, None) ->
-                        let! result = getOrMakeGameStats conn id g.UpdateTouchedAt
+                    | Some g, None ->
+                        let! result = getOrMakeGameStats dbContext id g.UpdateTouchedAt
                         return (result.PercentileTable, result.Average)
                 }
 
-            let (status, title, fetchedCount, totalPlays, timeLeft) =
+            let status, title, fetchedCount, totalPlays, timeLeft =
                 match (game, gameOrder) with
-                | (Some g, Some _) ->
+                | Some g, Some _ ->
                     match (g.Title, g.UpdateStartedAt, g.UpdateFinishedAt) with
-                    | (Some t, Some st, None) ->
+                    | Some t, Some st, None ->
                         let eta =
                             match g.FetchedPlays with
                             | 0 -> None
@@ -180,17 +180,17 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
                                 Some(timePerItem * (float itemsLeft))
 
                         ("Loading", t, g.FetchedPlays, g.TotalPlays, eta)
-                    | (Some t, _, Some _) -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
-                    | (Some t, None, _) -> ("Loading", t, 0, 0, None)
-                    | (None, _, _) -> ("Initial", $"Game #{id}", 0, 0, None)
+                    | Some t, _, Some _ -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
+                    | Some t, None, _ -> ("Loading", t, 0, 0, None)
+                    | None, _, _ -> ("Initial", $"Game #{id}", 0, 0, None)
 
-                | (Some g, None) ->
+                | Some g, None ->
                     match (g.Title, g.UpdateFinishedAt) with
-                    | (Some t, Some _) -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
-                    | (None, Some _) -> ("Loaded", "Game not found", g.FetchedPlays, g.TotalPlays, None)
-                    | (_, None) -> ("Initial", $"Game #{id}", 0, 0, None)
-                | (_, None)
-                | (None, _) -> ("Initial", $"Game #{id}", 0, 0, None)
+                    | Some t, Some _ -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
+                    | None, Some _ -> ("Loaded", "Game not found", g.FetchedPlays, g.TotalPlays, None)
+                    | _, None -> ("Initial", $"Game #{id}", 0, 0, None)
+                | _, None
+                | None, _ -> ("Initial", $"Game #{id}", 0, 0, None)
 
             let view =
                 Listing.Render(

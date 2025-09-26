@@ -1,13 +1,14 @@
 ﻿namespace GameTime.Controllers
 
+open GameTime.Data.Entities
 open Microsoft.AspNetCore.Http
 
 open Giraffe.ViewEngine
 
+open GameTime.Data
 open GameTime.ViewFns
-open GameTime.DataAccess
 
-// This can't be opened before DataAccess or the app crashes
+// This can't be opened before Data or the app crashes
 open Dapper.FSharp.SQLite
 
 type HomeController(dbContext: DbContext) =
@@ -17,7 +18,7 @@ type HomeController(dbContext: DbContext) =
 
             let! recentGames =
                 select {
-                    for g in gameTable do
+                    for g in dbContext.GameTable do
                         where (isNotNullValue g.UpdateFinishedAt)
                         andWhere (isNotNullValue g.Title)
                         orderByDescending g.UpdateFinishedAt

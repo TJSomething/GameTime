@@ -1,7 +1,7 @@
 module GameTime.ViewFns
 
 open System
-open GameTime.DataAccess
+open GameTime.Data.Entities
 open Giraffe.ViewEngine
 open Giraffe.ViewEngine.Accessibility
 open Humanizer
