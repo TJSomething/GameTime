@@ -43,15 +43,14 @@ type GameInitializationProcessor
                               TotalPlays = 0
                               UpdateFinishedAt = None
                               UpdateTouchedAt = DateTime.Now
-                              UpdateStartedAt = None }
-                              //YearPublished = None
-                              //BoxMinPlayTime = None
-                              //BoxPlayTime = None
-                              //BoxMaxPlayTime = None
-                              //BoxMinPlayers = None
-                              //BoxMaxPlayers = None
-                              //UpdateStatus = None
-                              //UpdateVersion = 2
+                              UpdateStartedAt = None
+                              YearPublished = None
+                              BoxMinPlayTime = None
+                              BoxPlayTime = None
+                              BoxMaxPlayTime = None
+                              BoxMinPlayers = None
+                              BoxMaxPlayers = None
+                              UpdateVersion = Some 1 }
                     }
                     |> db.GetConnection().InsertAsync
 
@@ -85,22 +84,43 @@ type GameInitializationProcessor
             return! fetcher.downloadXmlAsync url
         }
 
+    let chain f opt =
+        opt
+        |> Option.map f
+        |> Option.bind Option.ofObj
+
+    let attrStr path attr (doc: XDocument)  =
+        doc
+        |> Option.ofObj
+        |> chain _.XPathSelectElement(path)
+        |> chain _.Attribute(XName.Get(attr))
+        |> chain _.Value
+    
+    let attrInt path attr (doc: XDocument)  =
+        doc
+        |> attrStr path attr
+        |> Option.map int
+    
     let writeGameInfo (db: DbContext) (id: int) (xmlDoc: XDocument) =
         task {
-            let name =
-                xmlDoc
-                |> Option.ofObj
-                |> Option.map _.XPathSelectElement("//items/item/name[@value]")
-                |> Option.bind Option.ofObj
-                |> Option.map _.Attribute(XName.Get("value"))
-                |> Option.bind Option.ofObj
-                |> Option.map _.Value
-                |> Option.bind Option.ofObj
+            let name = attrStr "//items/item/name[@value]" "value" xmlDoc
+            let year = attrInt "//items/item/yearpublished[@value]" "value" xmlDoc
+            let minPlayers = attrInt "//items/item/minplayers[@value]" "value" xmlDoc
+            let maxPlayers = attrInt "//items/item/maxplayers[@value]" "value" xmlDoc
+            let playTime = attrInt "//items/item/playingtime[@value]" "value" xmlDoc
+            let minPlayTime = attrInt "//items/item/minplaytime[@value]" "value" xmlDoc
+            let maxPlayTime = attrInt "//items/item/maxplaytime[@value]" "value" xmlDoc
 
             let! _ =
                 update {
                     for g in db.GameTable do
                         setColumn g.Title name
+                        setColumn g.YearPublished year
+                        setColumn g.BoxPlayTime playTime
+                        setColumn g.BoxMinPlayTime minPlayTime
+                        setColumn g.BoxMaxPlayTime maxPlayTime
+                        setColumn g.BoxMinPlayers minPlayers
+                        setColumn g.BoxMaxPlayers maxPlayers
                         where (g.Id = id)
                 }
                 |> db.GetConnection().UpdateAsync

@@ -72,20 +72,17 @@ type PlayFetchProcessor(
 
             let playerCount = playerCountOpt |> Option.defaultValue 0
 
-            match (id, time, userIdOpt) with
-            | None, _, _
-            | _, 0, _
-            | _, _, None -> Seq.empty
-            | Some validId, validTime, Some validUserId ->
+            match (id, time) with
+            | None, _
+            | _, 0 -> Seq.empty
+            | Some validId, validTime ->
                 Seq.singleton (gameTitle, {
                     Id = validId
                     GameId = gameId
-                    //UserId = validUserId
+                    UserId = userIdOpt
                     Length = validTime
                     PlayerCount = playerCount
                 }))
-        
-        
         
     let rec fetchPlayPage (id: int) (page: int) =
         task {

@@ -65,6 +65,65 @@ let migrate2 (conn: IDbConnection) =
 
         return ()
     }
+    
+let migrate3 (conn: IDbConnection) =
+    task {
+        let! results =
+            """select name from pragma_table_xinfo('DbVersion')"""
+            |> conn.QueryAsync
+
+        let count = results.AsList().Count
+
+        if count = 0 then
+            let! _ =
+                """
+                create table Migration
+                (
+                    Id int identity
+                        constraint Migration_pk
+                            primary key
+                )
+                """ |> conn.ExecuteAsync
+                
+            let! _ = """alter table Game add column YearPublished int null""" |> conn.ExecuteAsync
+            let! _ = """alter table Game add column BoxMinPlayTime int null""" |> conn.ExecuteAsync
+            let! _ = """alter table Game add column BoxPlayTime int null""" |> conn.ExecuteAsync
+            let! _ = """alter table Game add column BoxMaxPlayTime int null""" |> conn.ExecuteAsync
+            let! _ = """alter table Game add column BoxMinPlayers int null""" |> conn.ExecuteAsync
+            let! _ = """alter table Game add column BoxMaxPlayers int null""" |> conn.ExecuteAsync
+            let! _ = """alter table Game add column UpdateVersion int null""" |> conn.ExecuteAsync
+            
+            let! _ = """alter table Play add column UserId int null""" |> conn.ExecuteAsync
+            
+            let! _ =
+                """
+                create table User
+                (
+                    Id int identity
+                        constraint User_pk
+                            primary key,
+                    Username text not null
+                )
+                """ |> conn.ExecuteAsync
+            
+            let! _ =
+                """
+                create table GameTag
+                (
+                    TagType int not null,
+                    Id int not null,
+                    Name text not null,
+                    constraint GameTag_pk primary key (TagType, Id)
+                )
+                """ |> conn.ExecuteAsync
+            
+            let _ =
+                """insert into Migration values ((0), (1), (2), (3))"""
+            
+            ()
+
+        return ()
+    }
 
 let safeInit (conn: IDbConnection) =
     task {
@@ -74,6 +133,7 @@ let safeInit (conn: IDbConnection) =
             do! migrate0 conn
             do! migrate1 conn
             do! migrate2 conn
+            do! migrate3 conn
             isAlreadyInitialized <- true
             OptionTypes.register ()
     }
