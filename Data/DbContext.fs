@@ -16,14 +16,15 @@ type DbContext() =
 
     let mutable connection: IDbConnection option = None
     
-    member this.GameTable = table<Game>
-    member this.PlayTable = table<Play>
+    member this.Game = table<Game>
+    member this.Play = table<Play>
+    member this.PlayerCountVote = table<PlayerCountVote>
 
     member this.GetConnection() =
         match connection with
         | Some conn when conn.State = ConnectionState.Open -> conn
         | _ ->
-            let connStr = conf.["sqliteConnectionString"]
+            let connStr = conf["sqliteConnectionString"]
             let newConn = new SqliteConnection(connStr)
             newConn.Open()
             connection <- Some newConn

@@ -7,6 +7,7 @@ open System.Xml.Linq
 
 open GameTime.Data
 open GameTime.Data.Entities
+open GameTime.XmlUtils
 open Microsoft.Extensions.DependencyInjection
 
 open Dapper
@@ -15,6 +16,10 @@ open Dapper.FSharp.SQLite
 type private PlayStatus =
     | FetchNextPage
     | FetchDone
+    
+type private ParsedPlay =
+    { GameTitle: string option
+      Play: Play }
 
 type PlayFetchProcessor(
     fetcher: XmlFetcher,
@@ -38,33 +43,29 @@ type PlayFetchProcessor(
         doc.Descendants("plays")
         |> Seq.collect _.Descendants("play")
         |> Seq.collect (fun play ->
-            let id =
-                play.Attribute("id").Value
-                |> Option.ofObj
-                |> Option.map int
+            let id = attrInt "." "id" play
             
-            let gameTitle =
-                play.Descendants(XName.Get("item"))
-                |> Seq.head
-                |> _.Attribute(XName.Get("name")).Value
+            let gameTitle = attrStr "item" "name" play
             
             let gameId =
-                play.Descendants(XName.Get("item"))
-                |> Seq.head
-                |> _.Attribute(XName.Get("objectid")).Value
-                |> int
+                attrInt "item" "objectid" play
+                |> Option.get
             
-            let userIdOpt =
-                play.Attribute("userid").Value
-                |> Option.ofObj
-                |> Option.map int
+            let userIdOpt = attrInt "." "userid" play
 
             let time =
-                play.Attribute(XName.Get("length")).Value
-                |> Option.ofObj
-                |> Option.map int
+                play
+                |> attrInt "." "length"
                 |> Option.defaultValue 0
 
+            let day =
+                play
+                |> attrStr "." "date"
+                |> Option.bind (fun str ->
+                    match DateOnly.TryParse(str) with
+                    | true, date -> Some date.DayNumber
+                    | false, _ -> None)
+                
             let playerCountOpt =
                 play.Descendants(XName.Get("players"))
                 |> Seq.tryHead
@@ -76,13 +77,17 @@ type PlayFetchProcessor(
             | None, _
             | _, 0 -> Seq.empty
             | Some validId, validTime ->
-                Seq.singleton (gameTitle, {
-                    Id = validId
-                    GameId = gameId
-                    UserId = userIdOpt
-                    Length = validTime
-                    PlayerCount = playerCount
-                }))
+                Seq.singleton {
+                    GameTitle = gameTitle
+                    Play = {
+                        Id = validId
+                        GameId = gameId
+                        UserId = userIdOpt
+                        Length = validTime
+                        PlayerCount = playerCount
+                        PlayedGregorianDay = day
+                    }
+                })
         
     let rec fetchPlayPage (id: int) (page: int) =
         task {
@@ -110,12 +115,12 @@ type PlayFetchProcessor(
                     
                 return FetchDone
             else
-                let titlePlayPairs = extractDataFromXml xmlDoc
+                let parsedPlays = extractDataFromXml xmlDoc
                 
                 let title =
-                    match Seq.tryHead titlePlayPairs with
-                    | Some (t, _) -> Some t
-                    | None -> None
+                    match Seq.tryHead parsedPlays with
+                    | Some { GameTitle = Some t } -> Some t
+                    | _ -> None
                     
                 let total = getPlayTotal xmlDoc
                 
@@ -137,18 +142,18 @@ type PlayFetchProcessor(
                            title = title |})
             
                 let plays =
-                    titlePlayPairs
-                    |> Seq.map snd
+                    parsedPlays
+                    |> Seq.map _.Play
                     |> Seq.toList
             
                 if List.length plays > 0 then
                     let! _ =
                         insert {
-                            into db.PlayTable
+                            into db.Play
                             values plays
                         } |> db.GetConnection().InsertOrReplaceAsync
                     ()
-                    
+            
                 return FetchNextPage
         }
         

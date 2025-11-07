@@ -65,12 +65,10 @@ let migrate2 (conn: IDbConnection) =
 
         return ()
     }
-    
+
 let migrate3 (conn: IDbConnection) =
     task {
-        let! results =
-            """select name from pragma_table_xinfo('DbVersion')"""
-            |> conn.QueryAsync
+        let! results = """select name from pragma_table_xinfo('Migration')""" |> conn.QueryAsync
 
         let count = results.AsList().Count
 
@@ -83,8 +81,9 @@ let migrate3 (conn: IDbConnection) =
                         constraint Migration_pk
                             primary key
                 )
-                """ |> conn.ExecuteAsync
-                
+                """
+                |> conn.ExecuteAsync
+
             let! _ = """alter table Game add column YearPublished int null""" |> conn.ExecuteAsync
             let! _ = """alter table Game add column BoxMinPlayTime int null""" |> conn.ExecuteAsync
             let! _ = """alter table Game add column BoxPlayTime int null""" |> conn.ExecuteAsync
@@ -92,34 +91,51 @@ let migrate3 (conn: IDbConnection) =
             let! _ = """alter table Game add column BoxMinPlayers int null""" |> conn.ExecuteAsync
             let! _ = """alter table Game add column BoxMaxPlayers int null""" |> conn.ExecuteAsync
             let! _ = """alter table Game add column UpdateVersion int null""" |> conn.ExecuteAsync
-            
+
             let! _ = """alter table Play add column UserId int null""" |> conn.ExecuteAsync
-            
+
+            let! _ =
+                """alter table Play add column PlayedGregorianDay int null"""
+                |> conn.ExecuteAsync
+
             let! _ =
                 """
-                create table User
+                create table PlayerCountVote
                 (
-                    Id int identity
-                        constraint User_pk
-                            primary key,
-                    Username text not null
+                    GameId int not null,
+                    PlayerCount int null,
+                    Best int not null,
+                    Recommended int not null,
+                    NotRecommended int not null
                 )
-                """ |> conn.ExecuteAsync
-            
+                """
+                |> conn.ExecuteAsync
+
             let! _ =
                 """
-                create table GameTag
+                create table GameRating
                 (
-                    TagType int not null,
-                    Id int not null,
-                    Name text not null,
-                    constraint GameTag_pk primary key (TagType, Id)
+                    GameId int not null,
+                    Username text not null,
+                    Rating int not null
                 )
-                """ |> conn.ExecuteAsync
-            
-            let _ =
-                """insert into Migration values ((0), (1), (2), (3))"""
-            
+                """
+                |> conn.ExecuteAsync
+
+            let! _ =
+                """
+                create table PlayAmountStats
+                (
+                    GameId int not null,
+                    Month int null,
+                    PlayerCount int null,
+                    UniquePlayers int not null,
+                    MinutesPlayed int not null,
+                    PlayCount int not null
+                )
+                """
+                |> conn.ExecuteAsync
+
             ()
 
         return ()
@@ -129,14 +145,13 @@ let safeInit (conn: IDbConnection) =
     task {
         if isAlreadyInitialized |> not then
             conn.Open()
-            let! _ = "PRAGMA foreign_keys = ON;" |> conn.ExecuteAsync
             do! migrate0 conn
             do! migrate1 conn
             do! migrate2 conn
             do! migrate3 conn
+            let! _ = "PRAGMA foreign_keys = ON;" |> conn.ExecuteAsync
             isAlreadyInitialized <- true
             OptionTypes.register ()
     }
     |> Async.AwaitTask
     |> Async.RunSynchronously
-

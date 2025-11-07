@@ -19,7 +19,7 @@ type Game =
       FetchedPlays: int
       TotalPlays: int }
 
-type PlayCountVotes =
+type PlayerCountVote =
     { GameId: int
       PlayerCount: int option
       Best: int
@@ -31,21 +31,16 @@ type Play =
       GameId: int
       UserId: int option
       Length: int
-      PlayerCount: int }
+      PlayerCount: int
+      PlayedGregorianDay: int option }
 
-type User =
-    { Id: int
-      Username: string }
-    
-type TagType =
-    | Category = 0
-    | Mechanic = 1
-    | Family = 2
-
-type GameTag =
-    { TagType: TagType
-      Id: int
-      Name: string }
+type PlayAmountStats =
+    { GameId: int
+      Month: int option
+      PlayerCount: int option
+      UniquePlayers: int
+      MinutesPlayed: int
+      PlayCount: int }
 
 type Migration =
     { Id: int }

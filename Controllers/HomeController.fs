@@ -19,7 +19,7 @@ type HomeController(dbContext: DbContext, config: AppConfig) =
 
             let! recentGames =
                 select {
-                    for g in dbContext.GameTable do
+                    for g in dbContext.Game do
                         where (isNotNullValue g.UpdateFinishedAt)
                         andWhere (isNotNullValue g.Title)
                         orderByDescending g.UpdateFinishedAt

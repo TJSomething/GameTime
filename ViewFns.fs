@@ -64,6 +64,9 @@ type Listing =
             pathBase: string,
             status: string,
             title: string,
+            year: int option,
+            minPlayers: int option,
+            maxPlayers: int option,
             playCount: int,
             totalPlays: int,
             averagePlayTime: float,
@@ -74,38 +77,52 @@ type Listing =
         let statusBody =
             (match status with
              | "Loaded" ->
-                 [ h1 [] [ str title ]
-                   p [] [ a [ _href $"https://boardgamegeek.com/boardgame/{id}/" ] [ str "BGG page" ] ]
-                   p [] [ str $"Plays: {playCount}" ]
-                   p [] [ str $"Average play time: %.0f{averagePlayTime}" ]
-                   h2 [] [ str "Percentiles for play time (minutes)" ]
-                   div
-                       [ _class "overflow-auto" ]
-                       [ table
-                             [ _class "striped" ]
-                             [ thead
-                                   []
-                                   [ tr
-                                         []
-                                         (seq {
-                                             for header in Seq.head percentileTable do
-                                                 yield (th [] [ str header ])
-                                          }
-                                          |> Seq.toList) ]
-                               tbody
-                                   []
-                                   (seq {
-                                       for row in Seq.tail percentileTable do
-                                           yield
-                                               tr
-                                                   []
-                                                   (seq {
-                                                       for cell in row do
-                                                           yield td [] [ str cell ]
-                                                    }
-                                                    |> Seq.toList)
-                                    }
-                                    |> Seq.toList) ] ] ]
+                 [ h1
+                       []
+                       [ match year with
+                         | Some y -> str $"{title} ({y})"
+                         | None -> str title ] ]
+                 @ (match minPlayers, maxPlayers with
+                    | Some min, Some max ->
+                        let countStr =
+                            match min, max with
+                            | 1, 1 -> "1 player"
+                            | x, y when x = y -> $"{x} players"
+                            | x, y -> $"{x} to {y} players"
+
+                        [ p [] [ str $"Official player count: {countStr}" ] ]
+                    | _ -> [])
+                   @ [ p [] [ a [ _href $"https://boardgamegeek.com/boardgame/{id}/" ] [ str "BGG page" ] ]
+                       p [] [ str $"Plays: {playCount}" ]
+                       p [] [ str $"Average play time: %.0f{averagePlayTime}" ]
+                       h2 [] [ str "Percentiles for play time (minutes)" ]
+                       div
+                           [ _class "overflow-auto" ]
+                           [ table
+                                 [ _class "striped" ]
+                                 [ thead
+                                       []
+                                       [ tr
+                                             []
+                                             (seq {
+                                                 for header in Seq.head percentileTable do
+                                                     yield (th [] [ str header ])
+                                              }
+                                              |> Seq.toList) ]
+                                   tbody
+                                       []
+                                       (seq {
+                                           for row in Seq.tail percentileTable do
+                                               yield
+                                                   tr
+                                                       []
+                                                       (seq {
+                                                           for cell in row do
+                                                               yield td [] [ str cell ]
+                                                        }
+                                                        |> Seq.toList)
+                                        }
+                                        |> Seq.toList) ] ] ]
              | "Loading" ->
                  List.concat
                      [ [ h1 [] [ str title ] ]

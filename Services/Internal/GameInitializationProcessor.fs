@@ -6,9 +6,11 @@ open System.Threading.Channels
 open System.Xml.Linq
 open System.Xml.XPath
 
+open Microsoft.Extensions.DependencyInjection
+
 open GameTime.Data
 open GameTime.Data.Entities
-open Microsoft.Extensions.DependencyInjection
+open GameTime.XmlUtils
 
 open Dapper.FSharp.SQLite
 
@@ -25,7 +27,7 @@ type GameInitializationProcessor
         task {
             let! gameResult =
                 select {
-                    for g in db.GameTable do
+                    for g in db.Game do
                         where (g.Id = id)
                 }
                 |> db.GetConnection().SelectAsync<Game>
@@ -34,7 +36,7 @@ type GameInitializationProcessor
             | None ->
                 let! _ =
                     insert {
-                        into db.GameTable
+                        into db.Game
                         value
                             { Id = id
                               AddedAt = DateTime.Now
@@ -58,18 +60,20 @@ type GameInitializationProcessor
             | Some _ ->
                 let! _ =
                     update {
-                        for g in db.GameTable do
+                        for g in db.Game do
                             setColumn g.UpdateStartedAt (Some DateTime.Now)
+                            setColumn g.UpdateFinishedAt None
                             setColumn g.UpdateTouchedAt DateTime.Now
                             setColumn g.FetchedPlays 0
                             setColumn g.TotalPlays 0
+                            setColumn g.UpdateVersion (Some 1)
                             where (g.Id = id)
                     }
                     |> db.GetConnection().UpdateAsync
 
                 let! _ =
                     delete {
-                        for p in db.PlayTable do
+                        for p in db.Play do
                             where (p.GameId = id)
                     }
                     |> db.GetConnection().DeleteAsync
@@ -83,23 +87,6 @@ type GameInitializationProcessor
 
             return! fetcher.downloadXmlAsync url
         }
-
-    let chain f opt =
-        opt
-        |> Option.map f
-        |> Option.bind Option.ofObj
-
-    let attrStr path attr (doc: XDocument)  =
-        doc
-        |> Option.ofObj
-        |> chain _.XPathSelectElement(path)
-        |> chain _.Attribute(XName.Get(attr))
-        |> chain _.Value
-    
-    let attrInt path attr (doc: XDocument)  =
-        doc
-        |> attrStr path attr
-        |> Option.map int
     
     let writeGameInfo (db: DbContext) (id: int) (xmlDoc: XDocument) =
         task {
@@ -113,7 +100,7 @@ type GameInitializationProcessor
 
             let! _ =
                 update {
-                    for g in db.GameTable do
+                    for g in db.Game do
                         setColumn g.Title name
                         setColumn g.YearPublished year
                         setColumn g.BoxPlayTime playTime
@@ -127,7 +114,40 @@ type GameInitializationProcessor
 
             ()
         }
-
+    
+    let getPlayerCountVotes (id: int) (xmlDoc: XDocument) =
+        xmlDoc
+        |> Option.ofObj
+        |?> _.XPathSelectElements("//items/item/poll[@name=\"suggested_numplayers\"]/results")
+        |> Option.toList
+        |> Seq.concat
+        |> Seq.collect (fun elem ->
+            let playerCount = attrInt "." "numplayers" elem
+            let best = attrInt "result[@value=\"Best\"]" "numvotes" elem
+            let recommended = attrInt "result[@value=\"Recommended\"]" "numvotes" elem
+            let notRecommended = attrInt "result[@value=\"Not Recommended\"]" "numvotes" elem
+            
+            match best, recommended, notRecommended with
+            | Some b, Some r, Some n ->
+                [{ GameId = id
+                   PlayerCount = playerCount
+                   Best = b
+                   Recommended = r
+                   NotRecommended = n }]
+            | _ -> [])
+        
+    let writePlayerCountVotes (db: DbContext) (votes: PlayerCountVote seq) =
+        task {
+            let conn = db.GetConnection()
+            let! _ =
+                insert {
+                    into db.PlayerCountVote
+                    values (Seq.toList votes)
+                }
+                |> conn.InsertAsync
+            ()
+        }
+    
     member this.Start(stoppingToken: CancellationToken) =
         task {
             use scope = serviceProvider.CreateAsyncScope()
@@ -143,6 +163,8 @@ type GameInitializationProcessor
                             do! initializeJob dbContext id
                             let! gameXml = fetchGame id
                             do! writeGameInfo dbContext id gameXml
+                            let playerCountVotes = getPlayerCountVotes id gameXml
+                            do! writePlayerCountVotes dbContext playerCountVotes
                         with ex ->
                             jobTracker.CloseJob(id) |> ignore
                             raise (Exception($"Error in fetching game {id}", ex))
