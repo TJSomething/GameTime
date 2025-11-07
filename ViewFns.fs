@@ -28,7 +28,14 @@ let master (pathBase: string) (titleText: string) (content: XmlNode list) =
                           []
                           [ ul [] [ li [] [ strong [] [ str "GameTime" ] ] ]
                             ul [] [ li [] [ a [ _href $"{pathBase}/" ] [ str "Home" ] ] ] ] ]
-                main [ _class "container" ] content ] ]
+                main [ _class "container" ] content
+                footer
+                    [ _class "container" ]
+                    [ a
+                          [ _href "https://boardgamegeek.com/" ]
+                          [ img
+                                [ _src
+                                      "https://cf.geekdo-images.com/HZy35cmzmmyV9BarSuk6ug__small/img/gbE7sulIurZE_Tx8EQJXnZSKI6w=/fit-in/200x150/filters:strip_icc()/pic7779581.png" ] ] ] ] ]
 
 // Views
 let homeView (pathBase: string) (recentGames: Game seq) =
