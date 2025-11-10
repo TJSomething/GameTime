@@ -13,7 +13,7 @@ type XmlFetcher(logger: ILogger) =
     let mutable lastRequestCompletion = DateTime.UnixEpoch
     let requestSemaphore = new SemaphoreSlim(1, 1)
 
-    let rec handle (url: string) =
+    let handle (url: string) =
         let mutable gotSemaphore = false
 
         let release () =
@@ -21,52 +21,76 @@ type XmlFetcher(logger: ILogger) =
                 requestSemaphore.Release() |> ignore
                 gotSemaphore <- false
 
-        task {
-            try
-                do! requestSemaphore.WaitAsync()
-                gotSemaphore <- true
+        let tryFetchTask () =
+            task {
+                try
+                    do! requestSemaphore.WaitAsync()
+                    gotSemaphore <- true
 
-                use client = new HttpClient()
+                    use client = new HttpClient()
 
-                let safeRequestWait =
-                    (lastRequestCompletion + TimeSpan.FromMilliseconds(requestDelay)) - DateTime.Now
+                    let safeRequestWait =
+                        (lastRequestCompletion + TimeSpan.FromMilliseconds(requestDelay)) - DateTime.Now
 
-                if (safeRequestWait.TotalMilliseconds > 0.0) then
-                    do! Task.Delay(safeRequestWait) // Throttle the request with a delay
+                    if (safeRequestWait.TotalMilliseconds > 0.0) then
+                        do! Task.Delay(safeRequestWait) // Throttle the request with a delay
 
-                let! response = client.GetAsync(url)
+                    let! response = client.GetAsync(url)
 
-                match response.StatusCode with
-                | System.Net.HttpStatusCode.OK ->
-                    let! rawXmlContent = response.Content.ReadAsStringAsync()
+                    match response.StatusCode with
+                    | System.Net.HttpStatusCode.OK ->
+                        let! rawXmlContent = response.Content.ReadAsStringAsync()
+
+                        // BGG doesn't escape ampersands correctly
+                        let xmlContent =
+                            Regex.Replace(
+                                rawXmlContent,
+                                "&(?!lt;|gt;|amp;|quot;|apos;|#[0-9]+;|#x[0-9a-fA-F]+;)",
+                                "&amp;"
+                            )
+
+                        return Some(XDocument.Parse(xmlContent))
+                    | System.Net.HttpStatusCode.TooManyRequests ->
+                        // Handle 429 errors by increasing the delay and retrying
+                        requestDelay <- requestDelay * 2
+
+                        logger.LogWarning(
+                            $"Received 429 Too Many Requests. Retrying with backoff (delay: {requestDelay} ms)..."
+                        )
+
+                        return None
+                    | _ ->
+                        // Handle other status codes (e.g., 500, 404) don't require increased delay
+                        logger.LogError($"Error: Status code %d{int response.StatusCode}")
+
+                        return None
+                finally
+                    release ()
+            }
+
+        // We are running a Task inside an Async inside a Task because
+        // we want infinite retry without blowing up the stack, which we
+        // can only get with Async but all the HTTP client stuff wants to
+        // use a Task.
+        let rec go () =
+            async {
+                try
+                    let! result = Async.AwaitTask(tryFetchTask ())
                     lastRequestCompletion <- DateTime.Now
-
-                    // BGG doesn't escape ampersands correctly
-                    let xmlContent =
-                        Regex.Replace(rawXmlContent, "&(?!lt;|gt;|amp;|quot;|apos;|#[0-9]+;|#x[0-9a-fA-F]+;)", "&amp;")
-
-                    return XDocument.Parse(xmlContent)
-                | System.Net.HttpStatusCode.TooManyRequests ->
-                    // Handle 429 errors by increasing the delay and retrying
-                    requestDelay <- requestDelay * 2
-
-                    logger.LogWarning(
-                        $"Received 429 Too Many Requests. Retrying with backoff (delay: {requestDelay} ms)..."
-                    )
-
-                    // Semaphores are not reentrant, and this could run across threads
                     release ()
 
-                    return! handle url
-                | _ ->
-                    // Handle other status codes (e.g., 500, 404) don't require increased delay
-                    logger.LogError($"Error: Status code %d{int response.StatusCode}")
-
+                    match result with
+                    | Some success -> return success
+                    | None -> return! go ()
+                with
+                | ex -> 
+                    logger.LogError(ex, "Unexpected error fetching")
+                    lastRequestCompletion <- DateTime.Now
                     release ()
+                    return! go ()
 
-                    return! handle url
-            finally
-                release ()
-        }
+            }
+
+        Async.StartAsTask(go ())
 
     member this.downloadXmlAsync(url: string) = handle url
