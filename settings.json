@@ -1,5 +1,0 @@
-{
-  "sqliteConnectionString": "Data Source=GameTime.db;Foreign Keys=True",
-  "PathBase": "",
-  "CacheSizeBytes": "100000000"
-}

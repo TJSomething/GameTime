@@ -38,7 +38,7 @@ let master (pathBase: string) (titleText: string) (content: XmlNode list) =
                                       "https://cf.geekdo-images.com/HZy35cmzmmyV9BarSuk6ug__small/img/gbE7sulIurZE_Tx8EQJXnZSKI6w=/fit-in/200x150/filters:strip_icc()/pic7779581.png" ] ] ] ] ]
 
 // Views
-let homeView (pathBase: string) (recentGames: Game seq) =
+let homeView (pathBase: string) (recentGames: Game seq) (bggToken: string) =
     master
         pathBase
         "GameTime"
@@ -52,7 +52,10 @@ let homeView (pathBase: string) (recentGames: Game seq) =
                |> Seq.map (fun g ->
                    li [] [ a [ _href $"game/{g.Id}" ] [ g.Title |> Option.defaultValue $"Game #{g.Id}" |> str ] ])
                |> Seq.toList)
-          script [ _src $"{pathBase}/js/index.js" ] [] ]
+          script [
+              _data "token" bggToken
+              _src $"{pathBase}/js/index.js"
+          ] [] ]
 
 type Listing =
     static member Render

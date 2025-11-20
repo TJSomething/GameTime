@@ -29,6 +29,15 @@ module Program =
                 .AddEnvironmentVariables("GAMETIME_")
                 .Build()
 
+        builder.Services.AddSingleton<AppConfig>(fun _ ->
+            let BggFrontendToken = configurationRoot.GetValue<string>("BggFrontendToken")
+            let BggBackendToken = configurationRoot.GetValue<string>("BggBackendToken")
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(BggFrontendToken, "BggFrontendToken")
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(BggFrontendToken, "BggBackendToken")
+            {
+                BggFrontendToken = BggFrontendToken
+                BggBackendToken = BggBackendToken
+            })
         builder.Services.AddScoped<DbContext>()
         builder.Services.AddMemoryCache(fun opt ->
             opt.SizeLimit <-

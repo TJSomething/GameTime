@@ -3,8 +3,9 @@
 (() => {
     const search = document.getElementById("search");
     const results = document.getElementById("results");
+    const token = document.currentScript?.getAttribute("data-token");
     
-    if (!(results instanceof HTMLUListElement) || !(search instanceof HTMLInputElement)) return;
+    if (!(results instanceof HTMLUListElement) || !(search instanceof HTMLInputElement) || !token) return;
     
     /**
      * @type {number | undefined}
@@ -69,7 +70,13 @@
             url.searchParams.set("exact", "1");
         }
 
-        const resp = await fetch(url);
+        const resp = await fetch(url, {
+            method: "GET",
+            mode: "cors",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+            },
+        });
         const rawXml = await resp.text();
         
         return extractGames(rawXml);

@@ -2,16 +2,22 @@ namespace GameTime.Services.Internal
 
 open System
 open System.Net.Http
+open System.Net.Http.Headers
 open System.Text.RegularExpressions
 open System.Threading
 open System.Threading.Tasks
 open System.Xml.Linq
+open GameTime.Services
 open Microsoft.Extensions.Logging
 
-type XmlFetcher(logger: ILogger) =
+type XmlFetcher(logger: ILogger, config: AppConfig) =
     let mutable requestDelay = 1000
     let mutable lastRequestCompletion = DateTime.UnixEpoch
     let requestSemaphore = new SemaphoreSlim(1, 1)
+    let client =
+        let c = new HttpClient()
+        c.DefaultRequestHeaders.Authorization <- AuthenticationHeaderValue("Bearer", config.BggBackendToken)
+        c
 
     let handle (url: string) =
         let mutable gotSemaphore = false
@@ -26,8 +32,6 @@ type XmlFetcher(logger: ILogger) =
                 try
                     do! requestSemaphore.WaitAsync()
                     gotSemaphore <- true
-
-                    use client = new HttpClient()
 
                     let safeRequestWait =
                         (lastRequestCompletion + TimeSpan.FromMilliseconds(requestDelay)) - DateTime.Now
@@ -82,8 +86,7 @@ type XmlFetcher(logger: ILogger) =
                     match result with
                     | Some success -> return success
                     | None -> return! go ()
-                with
-                | ex -> 
+                with ex ->
                     logger.LogError(ex, "Unexpected error fetching")
                     lastRequestCompletion <- DateTime.Now
                     release ()

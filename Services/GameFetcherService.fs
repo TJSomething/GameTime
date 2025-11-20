@@ -7,10 +7,10 @@ open GameTime.Services.Internal
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 
-type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameFetcherService>) =
+type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameFetcherService>, config: AppConfig) =
     inherit BackgroundService()
 
-    let fetcher = XmlFetcher(logger)
+    let fetcher = XmlFetcher(logger, config)
     let jobTracker = ActiveJobTracker()
     let playFetchQueue: int Channel = Channel.CreateUnbounded()
 

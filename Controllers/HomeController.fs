@@ -1,6 +1,7 @@
 ﻿namespace GameTime.Controllers
 
 open GameTime.Data.Entities
+open GameTime.Services
 open Microsoft.AspNetCore.Http
 
 open Giraffe.ViewEngine
@@ -11,7 +12,7 @@ open GameTime.ViewFns
 // This can't be opened before Data or the app crashes
 open Dapper.FSharp.SQLite
 
-type HomeController(dbContext: DbContext) =
+type HomeController(dbContext: DbContext, config: AppConfig) =
     member this.Index(pathBase: string) =
         task {
             use conn = dbContext.GetConnection()
@@ -30,6 +31,6 @@ type HomeController(dbContext: DbContext) =
                 Results.Content(
                     statusCode = 200,
                     contentType = "text/html",
-                    content = RenderView.AsString.htmlDocument (homeView pathBase recentGames)
+                    content = RenderView.AsString.htmlDocument (homeView pathBase recentGames config.BggFrontendToken)
                 )
         }

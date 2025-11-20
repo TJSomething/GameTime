@@ -21,6 +21,7 @@
         <Compile Include="Data\Migrations.fs" />
         <Compile Include="Data\DbContext.fs" />
         <Compile Include="ViewFns.fs" />
+        <Compile Include="Services\AppConfig.fs" />
         <Compile Include="Services\Internal\XmlFetcher.fs" />
         <Compile Include="Services\Internal\ActiveJobTracker.fs" />
         <Compile Include="Services\Internal\PlayFetchProcessor.fs" />
