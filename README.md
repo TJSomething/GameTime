@@ -11,3 +11,5 @@ Application-specific settings are set with settings.json or with the `GAMETIME_`
 - `sqliteConnectionString`: a connection string for SQLite (default: `Data Source=GameTime.db;Foreign Keys=True`)
 - `PathBase`: the base path for URLs (default is the empty string)
 - `CacheSizeBytes`: the number of bytes reserved for the in-memory cache (default: 100 MB)
+- `BggFrontendToken`: the token for the frontend to call BGG
+- `BggBackendToken`: the token for the backend to call BGG
