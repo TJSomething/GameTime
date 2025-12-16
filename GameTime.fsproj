@@ -28,6 +28,7 @@
         <Compile Include="Services\Internal\ActiveJobTracker.fs" />
         <Compile Include="Services\Internal\PlayFetchProcessor.fs" />
         <Compile Include="Services\Internal\GameInitializationProcessor.fs" />
+        <Compile Include="Services\Internal\GameIdleProcessor.fs" />
         <Compile Include="Services\GameFetcherService.fs" />
         <Compile Include="Controllers\GameController.fs" />
         <Compile Include="Controllers\HomeController.fs" />

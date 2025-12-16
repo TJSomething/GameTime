@@ -34,3 +34,10 @@ type ActiveJobTracker() =
             match jobIdToOrderNumber.TryGetValue(id) with
             | true, order -> Some(order - activeOrderNumbers.Min)
             | false, _ -> None)
+
+    /// <summary>
+    /// Gets the number of jobs active
+    /// </summary>
+    /// <returns>the number of active jobs</returns>
+    member this.GetJobCount() =
+        lock this (fun () -> jobIdToOrderNumber.Count)

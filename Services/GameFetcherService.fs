@@ -29,6 +29,13 @@ type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameF
             playJobChannel = playFetchQueue.Reader,
             jobTracker = jobTracker
         )
+        
+    let gameIdleProcessor =
+        GameIdleProcessor(
+            serviceProvider = serviceProvider,
+            enqueue = gameInitializationProcessor.EnqueueFetch,
+            getActiveJobCount = jobTracker.GetJobCount
+        )
 
     /// <summary>
     /// queues a game to be fetched.
@@ -60,5 +67,6 @@ type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameF
 
         Task.WhenAll(
             restartStrategy (fun () -> gameInitializationProcessor.Start(stoppingToken)),
-            restartStrategy (fun () -> playFetchProcessor.Start(stoppingToken))
+            restartStrategy (fun () -> playFetchProcessor.Start(stoppingToken)),
+            restartStrategy (fun () -> gameIdleProcessor.Start(stoppingToken))
         )
