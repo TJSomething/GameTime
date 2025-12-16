@@ -24,6 +24,7 @@
         <Compile Include="ViewFns.fs" />
         <Compile Include="Services\AppConfig.fs" />
         <Compile Include="Services\Internal\XmlFetcher.fs" />
+        <Compile Include="Services\Internal\PlayStats.fs" />
         <Compile Include="Services\Internal\ActiveJobTracker.fs" />
         <Compile Include="Services\Internal\PlayFetchProcessor.fs" />
         <Compile Include="Services\Internal\GameInitializationProcessor.fs" />

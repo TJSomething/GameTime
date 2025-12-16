@@ -19,6 +19,7 @@ type DbContext() =
     member this.Game = table<Game>
     member this.Play = table<Play>
     member this.PlayerCountVote = table<PlayerCountVote>
+    member this.PlayAmountStats = table<PlayAmountStats>
 
     member this.GetConnection() =
         match connection with

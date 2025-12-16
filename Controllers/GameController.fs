@@ -287,6 +287,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
                     averagePlayTime = average,
                     timeLeft = timeLeft,
                     percentileTable = percentileTable,
+                    monthlyPlayTable = monthlyPlayTable,
                     otherGamesAheadOfThisOne = gameOrder
                 )
 

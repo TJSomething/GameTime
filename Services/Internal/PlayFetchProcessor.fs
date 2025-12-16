@@ -7,6 +7,7 @@ open System.Xml.Linq
 
 open GameTime.Data
 open GameTime.Data.Entities
+open GameTime.Services.Internal.PlayStats
 open GameTime.XmlUtils
 open Microsoft.Extensions.DependencyInjection
 
@@ -101,18 +102,6 @@ type PlayFetchProcessor(
             let pagePlayCount = getPagePlayCount xmlDoc
             
             if pagePlayCount = 0 then
-                let! _ =
-                    db.GetConnection().ExecuteAsync(
-                        """
-                        update Game
-                        set UpdateTouchedAt = @now,
-                            UpdateStartedAt = coalesce(UpdateStartedAt, @now),
-                            UpdateFinishedAt = @now
-                        where id = @id
-                        """,
-                        {| now = DateTime.Now
-                           id = id |})
-                    
                 return FetchDone
             else
                 let parsedPlays = extractDataFromXml xmlDoc
@@ -157,6 +146,40 @@ type PlayFetchProcessor(
                 return FetchNextPage
         }
         
+    
+    let finalizePlays (db: DbContext) (id: int) =
+        task {
+            let! plays =
+                select {
+                    for p in db.Play do
+                        where (p.GameId = id)
+                }
+                |> db.GetConnection().SelectAsync<Play>
+            
+            let stats = calcMonthlyStats id plays
+            
+            if Seq.length stats > 0 then
+                let! _ =
+                    insert {
+                        into db.PlayAmountStats
+                        values (Seq.toList stats)
+                    } |> db.GetConnection().InsertOrReplaceAsync
+                ()
+                
+            let! _ =
+                db.GetConnection().ExecuteAsync(
+                    """
+                    update Game
+                    set UpdateTouchedAt = @now,
+                        UpdateStartedAt = coalesce(UpdateStartedAt, @now),
+                        UpdateFinishedAt = @now
+                    where id = @id
+                    """,
+                    {| now = DateTime.Now
+                       id = id |})
+            ()
+        }
+        
     member this.Start (stoppingToken: CancellationToken) =
         task {
             use scope = serviceProvider.CreateAsyncScope()
@@ -175,6 +198,9 @@ type PlayFetchProcessor(
                             let! newStatus = writePlayPage dbContext id playXml
                             page <- page + 1
                             status <- newStatus
+                            
+                            if status = FetchDone then
+                                do! finalizePlays dbContext id
                     finally
                         // If there's a failure, we don't want the system to think the job's still active
                         jobTracker.CloseJob(id) |> ignore
