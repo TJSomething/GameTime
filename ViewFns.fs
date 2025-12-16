@@ -50,7 +50,12 @@ let homeView (pathBase: string) (recentGames: Game seq) (bggToken: string) =
               []
               (recentGames
                |> Seq.map (fun g ->
-                   li [] [ a [ _href $"game/{g.Id}" ] [ g.Title |> Option.defaultValue $"Game #{g.Id}" |> str ] ])
+                   li [] [ a [ _href $"game/{g.Id}" ] [
+                       match g.Title, g.YearPublished with
+                       | Some t, Some 0 | Some t, None -> str t
+                       | Some t, Some y -> str $"{t} ({y})"
+                       | None, _ -> str $"Game #{g.Id}"
+                   ] ])
                |> Seq.toList)
           script [
               _data "token" bggToken
@@ -108,8 +113,8 @@ type Listing =
                  [ h1
                        []
                        [ match year with
-                         | Some y -> str $"{title} ({y})"
-                         | None -> str title ] ]
+                         | Some y when y <> 0 -> str $"{title} ({y})"
+                         | _ -> str title ] ]
                  @ (match minPlayers, maxPlayers with
                     | Some min, Some max ->
                         let countStr =
