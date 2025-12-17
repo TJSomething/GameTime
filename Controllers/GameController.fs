@@ -72,16 +72,17 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
             for playerCount, times in playerCountToTimes.Index() do
                 Array.Sort(times)
                 let playCount = times.Length
-                let qs = Seq.map (fun p -> Quantile.OfSorted.compute p times) ps
+                if playCount > 0 then
+                    let qs = Seq.map (fun p -> Quantile.OfSorted.compute p times) ps
 
-                yield
-                    seq {
-                        yield $"%d{playerCount}"
-                        yield $"%d{playCount}"
+                    yield
+                        seq {
+                            yield $"%d{playerCount}"
+                            yield $"%d{playCount}"
 
-                        for q in qs do
-                            yield $"%.0f{q}"
-                    }
+                            for q in qs do
+                                yield $"%.0f{q}"
+                        }
         }
 
     let getOrMakeGameStats (db: DbContext) (id: int) (gameModifiedDateTime: DateTime) =
@@ -161,8 +162,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
             
             if stats |> Seq.length > 0 then
                 let split = splitStats stats
-                let minPlayerCount, _ = split.ByPlayerCountAndMonth.Keys.Min()
-                let maxPlayerCount, _ = split.ByPlayerCountAndMonth.Keys.Max()
+                let playerCounts = split.ByPlayerCount.Keys |> Seq.sort
                 
                 let byPlay =
                     seq {
@@ -174,7 +174,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
                                 yield (monthToFirstDate month).ToString("MMM \"'\"yy", CultureInfo.InvariantCulture)
                         }
                         
-                        for playerCount in minPlayerCount .. maxPlayerCount do
+                        for playerCount in playerCounts do
                             yield seq {
                                 yield $"{playerCount}"
                                 
