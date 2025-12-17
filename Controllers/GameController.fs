@@ -27,9 +27,13 @@ type private CachedGameStats =
         // It's not a perfect measure, but JSON serialization is going to be a proportional upper bound on memory usage
         (Default.serialize this).Length
 
+type private PlayForTimeStats =
+    { PlayerCount: int
+      Length: int }
+
 type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache: IMemoryCache) =
 
-    let makePercentileTable (plays: {| PlayerCount: int; Length: int |} seq) =
+    let makePercentileTable (plays: PlayForTimeStats seq) =
         // Let's only allocate the times array once
         let playerCountToCount = Dictionary<int, int>()
         
@@ -90,7 +94,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
                             for p in db.Play do
                                 where (p.GameId = id)
                         }
-                        |> db.GetConnection().SelectAsync<{| PlayerCount: int; Length: int |}>
+                        |> db.GetConnection().SelectAsync<PlayForTimeStats>
 
                     let average =
                         if Seq.length plays > 0 then
