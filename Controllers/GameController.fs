@@ -5,6 +5,7 @@ open System
 open System.Collections.Generic
 open System.Globalization
 open System.Linq
+open Dapper
 open GameTime.Data
 open GameTime.Data.Entities
 open GameTime.Services
@@ -30,7 +31,7 @@ type private CachedGameStats =
 type private PlayForTimeStats =
     { PlayerCount: int
       Length: int }
-
+    
 type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache: IMemoryCache) =
 
     let makePercentileTable (plays: PlayForTimeStats seq) =
@@ -89,12 +90,26 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
 
             let create () =
                 task {
-                    let! plays =
-                        select {
-                            for p in db.Play do
-                                where (p.GameId = id)
-                        }
-                        |> db.GetConnection().SelectAsync<PlayForTimeStats>
+                    // Implement reading manually because Dapper doesn't
+                    // like mismatched tables and records in static linking
+                    // mode.
+                    let! reader =
+                        db.GetConnection().ExecuteReaderAsync(
+                            """
+                                select PlayerCount, Length
+                                from Play
+                                where GameId = @id
+                            """,
+                            {| id = id |})
+                    
+                    let plays = List<PlayForTimeStats>()
+                    
+                    try
+                        while reader.Read() do
+                            plays.Add { PlayerCount = reader.GetInt32(0)
+                                        Length = reader.GetInt32(1) }
+                    finally
+                        reader.Close()
 
                     let average =
                         if Seq.length plays > 0 then
