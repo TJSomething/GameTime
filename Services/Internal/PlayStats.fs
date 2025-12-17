@@ -35,8 +35,9 @@ let monthToFirstDate (month: int) =
     let year = month / 12 |> int
     let month = month % 12 + 1
     DateOnly(year, month, 1)
-    
-let calcMonthlyStats (gameId: int) (plays: Play seq) =
+
+/// Handles paginated play stats
+type MonthlyPlayStatsJob(gameId: int) =
     let mutable playerCountToDraft = Map.empty<int, PlayAmountStatsDraft>
     let mutable monthToDraft = Map.empty<int, PlayAmountStatsDraft>
     let mutable playerMonthToDraft = Map.empty<int * int, PlayAmountStatsDraft>
@@ -61,56 +62,57 @@ let calcMonthlyStats (gameId: int) (plays: Play seq) =
                           Set.singleton id
                       | None -> Set.empty
                    MinutesPlayed = play.Length }
-    
-    for play in plays do
-        let month =
-            play.PlayedGregorianDay
-            |> Option.map dayToMonth
-            |> Option.defaultValue -1
-            
-        playerCountToDraft <-
-            playerCountToDraft
-            |> Map.change play.PlayerCount (updateDraft play)
-            
-        monthToDraft <-
-            monthToDraft
-            |> Map.change month (updateDraft play)
-            
-        playerMonthToDraft <-
-            playerMonthToDraft
-            |> Map.change (play.PlayerCount, month) (updateDraft play)
-        
-        overallDraft <- updateDraft play overallDraft
+    member this.ProcessPlays (plays: Play seq) =
+        for play in plays do
+            let month =
+                play.PlayedGregorianDay
+                |> Option.map dayToMonth
+                |> Option.defaultValue -1
                 
-    let overallStats =
-        match overallDraft with
-        | Some draft -> draft.ToStats(
-            gameId = gameId,
-            month = None,
-            playerCount = None)
-        | None ->
-            { GameId = gameId
-              Month = None
-              PlayerCount = None
-              UniquePlayers = 0
-              MinutesPlayed = 0
-              PlayCount = 0 }
-    let byMonthStats =
-         monthToDraft
-         |> Map.map (fun month draft -> draft.ToStats(gameId, Some month, None))
-    let byPlayerCountStats =
-         playerCountToDraft
-         |> Map.map (fun playerCount draft -> draft.ToStats(gameId, None, Some playerCount))
-    let byPlayerCountAndMonthStats =
-         playerMonthToDraft
-         |> Map.map (fun (playerCount, month) draft -> draft.ToStats(gameId, Some month, Some playerCount))
+            playerCountToDraft <-
+                playerCountToDraft
+                |> Map.change play.PlayerCount (updateDraft play)
+                
+            monthToDraft <-
+                monthToDraft
+                |> Map.change month (updateDraft play)
+                
+            playerMonthToDraft <-
+                playerMonthToDraft
+                |> Map.change (play.PlayerCount, month) (updateDraft play)
+            
+            overallDraft <- updateDraft play overallDraft
     
-    Seq.concat [
-        Seq.singleton overallStats
-        byPlayerCountStats.Values
-        byMonthStats.Values
-        byPlayerCountAndMonthStats.Values
-    ]
+    member this.GetStats() =
+        let overallStats =
+            match overallDraft with
+            | Some draft -> draft.ToStats(
+                gameId = gameId,
+                month = None,
+                playerCount = None)
+            | None ->
+                { GameId = gameId
+                  Month = None
+                  PlayerCount = None
+                  UniquePlayers = 0
+                  MinutesPlayed = 0
+                  PlayCount = 0 }
+        let byMonthStats =
+             monthToDraft
+             |> Map.map (fun month draft -> draft.ToStats(gameId, Some month, None))
+        let byPlayerCountStats =
+             playerCountToDraft
+             |> Map.map (fun playerCount draft -> draft.ToStats(gameId, None, Some playerCount))
+        let byPlayerCountAndMonthStats =
+             playerMonthToDraft
+             |> Map.map (fun (playerCount, month) draft -> draft.ToStats(gameId, Some month, Some playerCount))
+        
+        Seq.concat [
+            Seq.singleton overallStats
+            byPlayerCountStats.Values
+            byMonthStats.Values
+            byPlayerCountAndMonthStats.Values
+        ]
 
 let splitStats (stats: PlayAmountStats seq) =
     let mutable playerCountToStat = Map.empty<int, PlayAmountStats>

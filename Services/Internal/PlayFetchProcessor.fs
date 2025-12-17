@@ -149,14 +149,28 @@ type PlayFetchProcessor(
     
     let finalizePlays (db: DbContext) (id: int) =
         task {
-            let! plays =
-                select {
-                    for p in db.Play do
-                        where (p.GameId = id)
-                }
-                |> db.GetConnection().SelectAsync<Play>
+            let mutable notDone = true
+            let mutable currentOffset = 0
+            let statsJob = MonthlyPlayStatsJob(id)
             
-            let stats = calcMonthlyStats id plays
+            while notDone do
+                let! plays =
+                    select {
+                        for p in db.Play do
+                            where (p.GameId = id)
+                            take currentOffset 1000
+                    }
+                    |> db.GetConnection().SelectAsync<Play>
+                    
+                let playsFound = plays |> Seq.length
+                
+                if playsFound = 0 then
+                    notDone <- false
+                else
+                    statsJob.ProcessPlays(plays)
+                    currentOffset <- currentOffset + playsFound
+            
+            let stats = statsJob.GetStats()
             
             if Seq.length stats > 0 then
                 let! _ =

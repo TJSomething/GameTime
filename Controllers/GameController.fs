@@ -3,7 +3,6 @@ namespace GameTime.Controllers
 open System
 
 open System.Collections.Generic
-open System.Collections.Immutable
 open System.Globalization
 open System.Linq
 open GameTime.Data
@@ -30,15 +29,26 @@ type private CachedGameStats =
 
 type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache: IMemoryCache) =
 
-    let makePercentileTable (plays: Play seq) =
-        let playerCountToTimes = Dictionary<int, int list>()
+    let makePercentileTable (plays: {| PlayerCount: int; Length: int |} seq) =
+        // Let's only allocate the times array once
+        let playerCountToCount = Dictionary<int, int>()
         
         for play in plays do
-            match playerCountToTimes.TryGetValue play.PlayerCount with
-            | true, counts ->
-                playerCountToTimes[play.PlayerCount] <- play.Length :: counts
-            | false, _ ->
-                playerCountToTimes[play.PlayerCount] <- [play.Length]
+            playerCountToCount[play.PlayerCount] <-
+                playerCountToCount.GetValueOrDefault(play.PlayerCount, 0) + 1
+        
+        let playerCountToTimes =
+            Array.init
+                (playerCountToCount.Keys.Max() + 1)
+                (fun i ->
+                    let l = playerCountToCount.GetValueOrDefault(i, 0)
+                    Array.create l 0.0)
+                                     
+        for play in plays do
+            let count = play.PlayerCount
+            let index = playerCountToCount[count] - 1
+            playerCountToTimes[count][index] <- play.Length |> float
+            playerCountToCount[count] <- index
 
         let ps = [ 0.1..0.1..0.9 ]
 
@@ -54,11 +64,10 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
                 }
 
             // Row for each player count
-            for playerCount in playerCountToTimes.Keys.ToImmutableSortedSet() do
-                let times = playerCountToTimes[playerCount]
-                let playCount = times |> Seq.length
-                let sorted = times |> Seq.sort |> Seq.map float
-                let qs = Quantile.computePercentiles Quantile.OfSorted.compute ps sorted
+            for playerCount, times in playerCountToTimes.Index() do
+                Array.Sort(times)
+                let playCount = times.Length
+                let qs = Seq.map (fun p -> Quantile.OfSorted.compute p times) ps
 
                 yield
                     seq {
@@ -81,7 +90,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
                             for p in db.Play do
                                 where (p.GameId = id)
                         }
-                        |> db.GetConnection().SelectAsync<Play>
+                        |> db.GetConnection().SelectAsync<{| PlayerCount: int; Length: int |}>
 
                     let average =
                         if Seq.length plays > 0 then
