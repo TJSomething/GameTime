@@ -162,7 +162,11 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache
             
             if stats |> Seq.length > 0 then
                 let split = splitStats stats
-                let playerCounts = split.ByPlayerCount.Keys |> Seq.sort
+                let playerCounts =
+                    split.ByPlayerCountAndMonth
+                    |> Seq.map (fun x -> fst x.Key)
+                    |> Seq.distinct
+                    |> Seq.sort
                 
                 let byPlay =
                     seq {
