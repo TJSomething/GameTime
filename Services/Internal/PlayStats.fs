@@ -1,7 +1,13 @@
 module GameTime.Services.Internal.PlayStats
 
 open System
+open System.Collections.Generic
+open System.Linq
 
+open Dapper.FSharp.SQLite
+open FSharp.Stats
+
+open GameTime.Data
 open GameTime.Data.Entities
 
 type PlayAmountStatsDraft =
@@ -141,3 +147,109 @@ let splitStats (stats: PlayAmountStats seq) =
       ByMonth = monthToStat
       ByPlayerCount = playerCountToStat
       ByPlayerCountAndMonth = playerMonthToStat }
+
+type PlayForTimeStats =
+    { PlayerCount: int
+      Length: int }
+    
+type PlayCountByPlayerCount =
+    { Count: int64
+      PlayerCount: int64 }
+            
+PreserveRecordFields<PlayCountByPlayerCount>
+ 
+type PlayTimePercentileTableJob
+    (db: DbContext, id: int) =
+    
+    let mutable playsProcessed = 0
+    
+    let mutable playerCountToCurrentIndex = Array.empty<int>
+
+    let mutable playerCountToTimes = Array.empty<float[]>
+    
+    let mutable average = 0.0
+    
+    member this.InitializeFromDb() =
+        task {
+            let! results =
+                select {
+                    for p in db.Play do
+                    count "*" "Count"
+                    where (p.GameId = id)
+                    groupBy p.PlayerCount
+                } |> db.GetConnection().SelectAsync<PlayCountByPlayerCount>
+            
+            if results |> Seq.length > 0 then
+                let playerCountToPlayCount =
+                    results
+                    |> Seq.map (fun row -> (row.PlayerCount, row.Count))
+                    |> Map.ofSeq
+                
+                playerCountToCurrentIndex <- Array.create (int (playerCountToPlayCount.Keys.Max() + 1L)) 0
+                
+                playerCountToTimes <-
+                    Array.init
+                        (int (playerCountToPlayCount.Keys.Max() + 1L))
+                        (fun i ->
+                            let l = playerCountToPlayCount.GetValueOrDefault(i, 0)
+                            Array.create (int l) 0.0)
+        }
+    
+    member this.FetchAndProcessPlayPage () =
+        task {
+            let! plays =
+                select {
+                    for p in db.Play do
+                        where (p.GameId = id)
+                        take playsProcessed 10000
+                }
+                |> db.GetConnection().SelectAsync<Play>
+             
+            if plays |> Seq.length > 0 then
+                for play in plays do
+                    let count = play.PlayerCount
+                    let index = playerCountToCurrentIndex[count]
+                    playerCountToTimes[count][index] <- play.Length |> float
+                    playerCountToCurrentIndex[count] <- index + 1
+                    
+                    // Cumulative average
+                    average <- ((float play.Length) + (float playsProcessed) * average) / ((float playsProcessed) + 1.0)
+                    playsProcessed <- playsProcessed + 1
+                    
+                return true
+            else
+                return false
+        }
+    
+    member this.GetAverage () = average
+    
+    member this.BuildTable () =
+        let ps = [ 0.1..0.1..0.9 ]
+
+        seq {
+            // Header row
+            yield
+                seq {
+                    yield "Players"
+                    yield "Plays"
+
+                    for p in ps do
+                        yield (sprintf "%d%%" (int (p * 100.0)))
+                }
+
+            // Row for each player count
+            for playerCount, times in playerCountToTimes.Index() do
+                Array.Sort(times)
+                let playCount = times.Length
+                if playCount > 0 then
+                    let qs = Seq.map (fun p -> Quantile.OfSorted.compute p times) ps
+
+                    yield
+                        seq {
+                            yield $"%d{playerCount}"
+                            yield $"%d{playCount}"
+
+                            for q in qs do
+                                yield $"%.0f{q}"
+                        }
+        }

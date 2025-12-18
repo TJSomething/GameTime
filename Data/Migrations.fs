@@ -2,10 +2,14 @@ module GameTime.Data.Migrations
 
 open System.Data
 
+open System.Diagnostics.CodeAnalysis
+open System.Linq
 open Dapper
 open Dapper.FSharp.SQLite
+open GameTime.Data.Entities
 
 let mutable isAlreadyInitialized = false
+let private MigrationTable = table<Migration>
 
 let migrate0 (conn: IDbConnection) =
     task {
@@ -141,6 +145,37 @@ let migrate3 (conn: IDbConnection) =
         return ()
     }
 
+[<DynamicDependency("Id", typedefof<Migration>)>]
+let migrate4 (conn: IDbConnection) =
+    task {
+        let! results =
+            select {
+                for m in MigrationTable do
+                where (m.Id = 4L)
+            }
+            |> conn.SelectAsync<Migration>
+
+        if results.Count() = 0 then
+            let! _ =
+                """
+                create table CacheItem
+                (
+                    Id text primary key not null,
+                    Version int not null,
+                    Value text not null
+                )
+                """
+                |> conn.ExecuteAsync
+
+            let! _ =
+                insert {
+                    into MigrationTable
+                    value { Id = 4L }
+                } |> conn.InsertAsync
+            ()
+
+        return ()
+    }
 let safeInit (conn: IDbConnection) =
     task {
         if isAlreadyInitialized |> not then
@@ -149,6 +184,7 @@ let safeInit (conn: IDbConnection) =
             do! migrate1 conn
             do! migrate2 conn
             do! migrate3 conn
+            do! migrate4 conn
             let! _ = "PRAGMA foreign_keys = ON;" |> conn.ExecuteAsync
             isAlreadyInitialized <- true
             OptionTypes.register ()

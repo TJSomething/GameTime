@@ -4,6 +4,7 @@
         <TargetFramework>net9.0</TargetFramework>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+        <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
     </PropertyGroup>
     
     <PropertyGroup Condition="'$(Configuration)' == 'Release'">
@@ -21,6 +22,7 @@
         <Compile Include="Data\Entities.fs" />
         <Compile Include="Data\Migrations.fs" />
         <Compile Include="Data\DbContext.fs" />
+        <Compile Include="Data\DbCache.fs" />
         <Compile Include="ViewFns.fs" />
         <Compile Include="Services\AppConfig.fs" />
         <Compile Include="Services\Internal\XmlFetcher.fs" />
@@ -38,10 +40,10 @@
     <ItemGroup>
         <PackageReference Include="Dapper.FSharp" Version="4.9.0" />
         <PackageReference Include="FSharp.Stats" Version="0.6.0" />
+        <PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
         <PackageReference Include="Giraffe.ViewEngine" Version="1.4.0" />
         <PackageReference Include="Humanizer.Core" Version="3.0.0-beta.96" />
         <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.8" />
-        <PackageReference Include="Microsoft.FSharpLu.Json" Version="0.11.7" />
     </ItemGroup>
     
     <ItemGroup>

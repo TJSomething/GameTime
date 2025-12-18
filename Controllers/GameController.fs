@@ -1,22 +1,17 @@
 namespace GameTime.Controllers
 
 open System
-
-open System.Collections.Generic
 open System.Globalization
-open System.Linq
-open Dapper
+
+open Microsoft.AspNetCore.Http
+
+open Dapper.FSharp.SQLite
+
 open GameTime.Data
+open GameTime.Data.DbCache
 open GameTime.Data.Entities
 open GameTime.Services
 open GameTime.Services.Internal.PlayStats
-open Microsoft.AspNetCore.Http
-open Microsoft.Extensions.Caching.Memory
-
-open Dapper.FSharp.SQLite
-open FSharp.Stats
-open Microsoft.FSharpLu.Json
-
 open GameTime.ViewFns
 
 type private CachedGameStats =
@@ -24,124 +19,35 @@ type private CachedGameStats =
       PercentileTable: string seq seq
       Average: float }
 
-    member this.GetCacheSize() =
-        // It's not a perfect measure, but JSON serialization is going to be a proportional upper bound on memory usage
-        (Default.serialize this).Length
-
-type private PlayForTimeStats =
-    { PlayerCount: int
-      Length: int }
+type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
+    static let STAT_VERSION = 1
     
-type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, cache: IMemoryCache) =
-
-    let makePercentileTable (plays: PlayForTimeStats seq) =
-        // Let's only allocate the times array once
-        let playerCountToCount = Dictionary<int, int>()
-        
-        for play in plays do
-            playerCountToCount[play.PlayerCount] <-
-                playerCountToCount.GetValueOrDefault(play.PlayerCount, 0) + 1
-        
-        let playerCountToTimes =
-            Array.init
-                (playerCountToCount.Keys.Max() + 1)
-                (fun i ->
-                    let l = playerCountToCount.GetValueOrDefault(i, 0)
-                    Array.create l 0.0)
-                                     
-        for play in plays do
-            let count = play.PlayerCount
-            let index = playerCountToCount[count] - 1
-            playerCountToTimes[count][index] <- play.Length |> float
-            playerCountToCount[count] <- index
-
-        let ps = [ 0.1..0.1..0.9 ]
-
-        seq {
-            // Header row
-            yield
-                seq {
-                    yield "Players"
-                    yield "Plays"
-
-                    for p in ps do
-                        yield (sprintf "%d%%" (int (p * 100.0)))
-                }
-
-            // Row for each player count
-            for playerCount, times in playerCountToTimes.Index() do
-                Array.Sort(times)
-                let playCount = times.Length
-                if playCount > 0 then
-                    let qs = Seq.map (fun p -> Quantile.OfSorted.compute p times) ps
-
-                    yield
-                        seq {
-                            yield $"%d{playerCount}"
-                            yield $"%d{playCount}"
-
-                            for q in qs do
-                                yield $"%.0f{q}"
-                        }
-        }
-
     let getOrMakeGameStats (db: DbContext) (id: int) (gameModifiedDateTime: DateTime) =
         task {
             let key = $"game-stats-{id}"
-
+            
             let create () =
                 task {
-                    // Implement reading manually because Dapper doesn't
-                    // like mismatched tables and records in static linking
-                    // mode.
-                    let! reader =
-                        db.GetConnection().ExecuteReaderAsync(
-                            """
-                                select PlayerCount, Length
-                                from Play
-                                where GameId = @id
-                            """,
-                            {| id = id |})
+                    let job = PlayTimePercentileTableJob(db, id)
                     
-                    let plays = List<PlayForTimeStats>()
+                    do! job.InitializeFromDb()
                     
-                    try
-                        while reader.Read() do
-                            plays.Add { PlayerCount = reader.GetInt32(0)
-                                        Length = reader.GetInt32(1) }
-                    finally
-                        reader.Close()
-
-                    let average =
-                        if Seq.length plays > 0 then
-                            plays |> Seq.averageBy (fun p -> p.Length |> float)
-                        else
-                            0.0
-
+                    while! job.FetchAndProcessPlayPage() do
+                        ()
+                    
                     return
                         { ModifiedAt = gameModifiedDateTime
-                          PercentileTable = makePercentileTable plays
-                          Average = average }
+                          PercentileTable = job.BuildTable()
+                          Average = job.GetAverage() }
                 }
 
-            let! cached =
-                cache.GetOrCreateAsync(
-                    key,
-                    (fun cacheItem ->
-                        task {
-                            let! result = create ()
-                            cacheItem.Size <- result.GetCacheSize()
-                            cacheItem.SlidingExpiration <- TimeSpan.FromDays(7)
-                            return result
-                        })
-                )
+            let! cached = getOrCreateFromCache dbContext key STAT_VERSION create
 
             // Reset cache entry if we have newer data
             if cached.ModifiedAt < gameModifiedDateTime then
                 let! newStats = create ()
-                let opts = MemoryCacheEntryOptions()
-                opts.Size <- newStats.GetCacheSize()
-                return cache.Set(key, newStats, opts)
+                do! addToCache dbContext key STAT_VERSION newStats
+                return newStats
             else
                 return cached
         }

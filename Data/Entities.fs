@@ -1,6 +1,8 @@
 module GameTime.Data.Entities
 
 open System
+open System.Diagnostics.CodeAnalysis
+open System.Reflection
 
 type Game =
     { Id: int
@@ -42,5 +44,18 @@ type PlayAmountStats =
       MinutesPlayed: int
       PlayCount: int }
 
+[<CLIMutable>]
+[<DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)>]
 type Migration =
-    { Id: int }
+    { Id: int64 }
+
+type CacheItem =
+    { Id: string
+      Version: int
+      Value: string }
+
+/// Reference record fields to ensure that entities property names can be reflected for queries
+let inline PreserveRecordFields<'T> =
+    FSharp.Reflection.FSharpType.GetRecordFields(typeof<'T>, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)
+    |> ignore
+ 
