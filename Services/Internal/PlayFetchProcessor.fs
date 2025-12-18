@@ -174,6 +174,11 @@ type PlayFetchProcessor(
             
             if Seq.length stats > 0 then
                 let! _ =
+                    delete {
+                        for s in db.PlayAmountStats do
+                        where (s.GameId = id)
+                    } |> db.GetConnection().DeleteAsync
+                let! _ =
                     insert {
                         into db.PlayAmountStats
                         values (Seq.toList stats)
