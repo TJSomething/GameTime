@@ -4,6 +4,7 @@ open System
 open System.Threading.Channels
 open System.Threading.Tasks
 open GameTime.Services.Internal
+open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 
@@ -17,6 +18,7 @@ type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameF
     let gameInitializationProcessor =
         GameInitializationProcessor(
             serviceProvider = serviceProvider,
+            logger = serviceProvider.GetRequiredService<ILogger<GameInitializationProcessor>>(),
             fetcher = fetcher,
             playFetchChannel = playFetchQueue.Writer,
             jobTracker = jobTracker

@@ -7,6 +7,7 @@ open System.Xml.Linq
 open System.Xml.XPath
 
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 
 open GameTime.Data
 open GameTime.Data.Entities
@@ -17,6 +18,7 @@ open Dapper.FSharp.SQLite
 type GameInitializationProcessor
     (
         fetcher: XmlFetcher,
+        logger: ILogger,
         playFetchChannel: ChannelWriter<int>,
         jobTracker: ActiveJobTracker,
         serviceProvider: IServiceProvider
@@ -160,6 +162,7 @@ type GameInitializationProcessor
 
                     if jobTracker.StartJob(id) then
                         try
+                            logger.LogInformation("Fetching game #{Game}", id)
                             do! initializeJob dbContext id
                             let! gameXml = fetchGame id
                             do! writeGameInfo dbContext id gameXml
