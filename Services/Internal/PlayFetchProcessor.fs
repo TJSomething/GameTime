@@ -3,6 +3,7 @@ namespace GameTime.Services.Internal
 open System
 open System.Threading
 open System.Threading.Channels
+open System.Threading.Tasks
 open System.Xml.Linq
 
 open GameTime.Data
@@ -10,6 +11,7 @@ open GameTime.Data.DbCache
 open GameTime.Data.Entities
 open GameTime.Services.Internal.PlayStats
 open GameTime.XmlUtils
+open Microsoft.Data.Sqlite
 open Microsoft.Extensions.DependencyInjection
 
 open Dapper
@@ -224,9 +226,19 @@ type PlayFetchProcessor(
                     try
                         while (not stoppingToken.IsCancellationRequested && status <> FetchDone) do
                             let! playXml = fetchPlayPage id page
-                            let! newStatus = writePlayPage dbContext id playXml
-                            page <- page + 1
-                            status <- newStatus
+                            let mutable notDone = true
+                            while notDone do
+                                try
+                                    let! newStatus = writePlayPage dbContext id playXml
+                                    page <- page + 1
+                                    status <- newStatus
+                                with
+                                | :? SqliteException as ex ->
+                                    // Wait if the database is locked
+                                    if ex.SqliteErrorCode <> 5 then
+                                        raise ex
+                                    else
+                                        do! Task.Delay 100
                             
                             if status = FetchDone then
                                 do! finalizePlays dbContext id
