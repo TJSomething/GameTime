@@ -14,39 +14,18 @@ open GameTime.Services
 open GameTime.Services.Internal.PlayStats
 open GameTime.ViewFns
 
-type private CachedGameStats =
-    { ModifiedAt: DateTime
-      PercentileTable: string seq seq
-      Average: float }
-
 type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
-    static let STAT_VERSION = 1
-    
     let getOrMakeGameStats (db: DbContext) (id: int) (gameModifiedDateTime: DateTime) =
         task {
-            let key = $"game-stats-{id}"
-            
-            let create () =
-                task {
-                    let job = PlayTimePercentileTableJob(db, id)
-                    
-                    do! job.InitializeFromDb()
-                    
-                    while! job.FetchAndProcessPlayPage() do
-                        ()
-                    
-                    return
-                        { ModifiedAt = gameModifiedDateTime
-                          PercentileTable = job.BuildTable()
-                          Average = job.GetAverage() }
-                }
-
-            let! cached = getOrCreateFromCache dbContext key STAT_VERSION create
+            let key = PlayTimePercentileTableJob.GetCacheKey(id)
+            let version = PlayTimePercentileTableJob.STAT_VERSION
+            let create () = PlayTimePercentileTableJob.Run(db, id, gameModifiedDateTime)
+            let! cached = getOrCreateFromCache dbContext key version create
 
             // Reset cache entry if we have newer data
             if cached.ModifiedAt < gameModifiedDateTime then
                 let! newStats = create ()
-                do! addToCache dbContext key STAT_VERSION newStats
+                do! addToCache dbContext key version newStats
                 return newStats
             else
                 return cached

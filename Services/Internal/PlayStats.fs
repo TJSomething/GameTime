@@ -155,6 +155,11 @@ type PlayForTimeStats =
 type PlayCountByPlayerCount =
     { Count: int64
       PlayerCount: int64 }
+
+type CachedGamePlayTimeStats =
+    { ModifiedAt: DateTime
+      PercentileTable: string seq seq
+      Average: float }
             
 PreserveRecordFields<PlayCountByPlayerCount>
  
@@ -168,6 +173,24 @@ type PlayTimePercentileTableJob
     let mutable playerCountToTimes = Array.empty<float[]>
     
     let mutable average = 0.0
+    
+    static member Run (db: DbContext, id: int, gameModifiedDateTime) =
+        task {
+            let job = PlayTimePercentileTableJob(db, id)
+            
+            do! job.InitializeFromDb()
+            
+            while! job.FetchAndProcessPlayPage() do
+                ()
+            
+            return
+                { ModifiedAt = gameModifiedDateTime
+                  PercentileTable = job.BuildTable()
+                  Average = job.GetAverage() }
+        }
+    
+    static member STAT_VERSION = 1
+    static member GetCacheKey (id: int) = $"game-stats-{id}"
     
     member this.InitializeFromDb() =
         task {

@@ -6,6 +6,7 @@ open System.Threading.Channels
 open System.Xml.Linq
 
 open GameTime.Data
+open GameTime.Data.DbCache
 open GameTime.Data.Entities
 open GameTime.Services.Internal.PlayStats
 open GameTime.XmlUtils
@@ -184,6 +185,15 @@ type PlayFetchProcessor(
                         values (Seq.toList stats)
                     } |> db.GetConnection().InsertOrReplaceAsync
                 ()
+            
+            let now = DateTime.Now
+            
+            let! playTimePercentileTable = PlayTimePercentileTableJob.Run(db, id, now)
+            do! addToCache
+                    db
+                    (PlayTimePercentileTableJob.GetCacheKey(id))
+                    PlayTimePercentileTableJob.STAT_VERSION
+                    playTimePercentileTable
                 
             let! _ =
                 db.GetConnection().ExecuteAsync(
@@ -194,7 +204,7 @@ type PlayFetchProcessor(
                         UpdateFinishedAt = @now
                     where id = @id
                     """,
-                    {| now = DateTime.Now
+                    {| now = now
                        id = id |})
             ()
         }
