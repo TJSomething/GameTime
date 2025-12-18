@@ -3,6 +3,7 @@ namespace GameTime.Controllers
 open System
 open System.Globalization
 
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 
 open Dapper.FSharp.SQLite
@@ -97,25 +98,34 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
             let game = Seq.tryHead gameResult
             let gameOrder = gameFetcher.GetJobOrder(id)
 
-            let! percentileTable, monthlyPlayTable, average =
-                task {
-                    match (game, gameOrder) with
-                    | None, _ ->
-                        // Start if no data
-                        gameFetcher.EnqueueFetch(id)
-                        return (Seq.empty, Seq.empty, 0.0)
-                    | Some g, None when g.UpdateFinishedAt.IsNone ->
-                        // If there is incomplete data, but no job, then assume that the job failed
-                        gameFetcher.EnqueueFetch(id)
-                        return (Seq.empty, Seq.empty, 0.0)
-                    | _, Some _ ->
-                        // Don't start but don't report any plays if a job is in progress
-                        return (Seq.empty, Seq.empty, 0.0)
-                    | Some g, None ->
-                        let! result = getOrMakeGameStats dbContext id g.UpdateTouchedAt
-                        let! byMonth = getMonthlyStats dbContext g.Id g.UpdateTouchedAt
-                        return (result.PercentileTable, byMonth, result.Average)
-                }
+            let! statResultTask =
+                Task.WhenAny(
+                        task {
+                            match (game, gameOrder) with
+                            | None, _ ->
+                                // Start if no data
+                                gameFetcher.EnqueueFetch(id)
+                                return (Seq.empty, Seq.empty, 0.0)
+                            | Some g, None when g.UpdateFinishedAt.IsNone ->
+                                // If there is incomplete data, but no job, then assume that the job failed
+                                gameFetcher.EnqueueFetch(id)
+                                return (Seq.empty, Seq.empty, 0.0)
+                            | _, Some _ ->
+                                // Don't start but don't report any plays if a job is in progress
+                                return (Seq.empty, Seq.empty, 0.0)
+                            | Some g, None ->
+                                let! result = getOrMakeGameStats dbContext id g.UpdateTouchedAt
+                                let! byMonth = getMonthlyStats dbContext g.Id g.UpdateTouchedAt
+                                return (result.PercentileTable, byMonth, result.Average)
+                        },
+                        task {
+                            do! Task.Delay 20_000
+                            let loading = "Loading..." |> Seq.singleton |> Seq.singleton
+                            return (loading, loading, 0.0)
+                        }
+                    )
+                
+            let! percentileTable, monthlyPlayTable, average = statResultTask
 
             let status, title, fetchedCount, totalPlays, timeLeft =
                 match (game, gameOrder) with
