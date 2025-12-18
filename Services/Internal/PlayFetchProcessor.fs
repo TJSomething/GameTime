@@ -232,6 +232,7 @@ type PlayFetchProcessor(
                                     let! newStatus = writePlayPage dbContext id playXml
                                     page <- page + 1
                                     status <- newStatus
+                                    notDone <- false
                                 with
                                 | :? SqliteException as ex ->
                                     // Wait if the database is locked
