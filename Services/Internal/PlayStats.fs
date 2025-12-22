@@ -152,6 +152,7 @@ type PlayForTimeStats =
     { PlayerCount: int
       Length: int }
     
+[<CLIMutable>]
 type PlayCountByPlayerCount =
     { Count: int64
       PlayerCount: int64 }
