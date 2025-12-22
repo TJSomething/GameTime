@@ -59,8 +59,10 @@ type GameIdleProcessor
                     select {
                         for game in dbContext.Game do
                         count "*" "Value"
-                    } |> dbContext.GetConnection().SelectAsync<{| Value: int |}>
-                let gameCount = gameCountResult |> Seq.head |> _.Value
+                    } |> dbContext.GetConnection().SelectAsync<{| Value: int64 |}>
+                PreserveRecordFields<{| Value: int64 |}>
+                    
+                let gameCount = gameCountResult |> Seq.head |> _.Value |> int
                 
                 let randomOffset = Random.Shared.Next(gameCount)
                     
@@ -86,9 +88,8 @@ type GameIdleProcessor
                 let ids = extractGameIds resultXml
                 let! missingIds = filterExistingGameIds dbContext ids
                 result <- missingIds |> Seq.randomShuffle
-                    
                 tries <- tries + 1
-
+ 
             return result
         }
     
