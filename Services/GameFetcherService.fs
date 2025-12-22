@@ -3,10 +3,11 @@ namespace GameTime.Services
 open System
 open System.Threading.Channels
 open System.Threading.Tasks
-open GameTime.Services.Internal
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
+
+open GameTime.Services.Internal
 
 type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameFetcherService>, config: AppConfig) =
     inherit BackgroundService()
@@ -36,7 +37,8 @@ type GameFetcherService(serviceProvider: IServiceProvider, logger: ILogger<GameF
         GameIdleProcessor(
             serviceProvider = serviceProvider,
             enqueue = gameInitializationProcessor.EnqueueFetch,
-            getActiveJobCount = jobTracker.GetJobCount
+            getActiveJobCount = jobTracker.GetJobCount,
+            fetcher = fetcher
         )
 
     /// <summary>
