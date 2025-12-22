@@ -160,8 +160,6 @@ type CachedGamePlayTimeStats =
     { ModifiedAt: DateTime
       PercentileTable: string seq seq
       Average: float }
-            
-PreserveRecordFields<PlayCountByPlayerCount>
  
 type PlayTimePercentileTableJob
     (db: DbContext, id: int) =
@@ -201,6 +199,7 @@ type PlayTimePercentileTableJob
                     where (p.GameId = id)
                     groupBy p.PlayerCount
                 } |> db.GetConnection().SelectAsync<PlayCountByPlayerCount>
+            PreserveRecordFields<PlayCountByPlayerCount>
             
             if results |> Seq.length > 0 then
                 let playerCountToPlayCount =
