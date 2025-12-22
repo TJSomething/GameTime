@@ -102,6 +102,14 @@ type GameIdleProcessor
             return missingHotIds
         }
         
+    // Once a minute, if no games are being fetched, check for each of these until a
+    // matching game is found.
+    //
+    // - Games that were unfinished but successfully fetched at least some plays
+    // - Finished games that used an old version of the fetcher
+    // - Games on the BGG hottest games list
+    // - A random game using random search strings
+    // - The least recently updated game
     member this.Start(stoppingToken: CancellationToken) =
         task {
             use scope = serviceProvider.CreateAsyncScope()
@@ -109,6 +117,17 @@ type GameIdleProcessor
             while (not stoppingToken.IsCancellationRequested) do
                 let! nextGameId =
                     task {
+                        let mutable result = None
+                        
+                        let calcResultIfNeeded (thunk: unit -> int option Task) =
+                            task {
+                                match result with
+                                | None ->
+                                    let! newResult = thunk()
+                                    result <- newResult
+                                | Some _ -> ()
+                            }
+                        
                         if getActiveJobCount() = 0 then
                             use dbContext = scope.ServiceProvider.GetRequiredService<DbContext>()
                             
@@ -121,27 +140,60 @@ type GameIdleProcessor
                                         take 0 1
                                 }
                                 |> dbContext.GetConnection().SelectAsync<Game>
+                                
+                            result <- unfinishedGames |> Seq.tryHead |> Option.map _.Id
                             
-                            let! oldGames =
-                                select {
-                                    for g in dbContext.Game do
-                                        where (isNotNullValue g.UpdateFinishedAt)
-                                        andWhere (g.UpdateVersion < currentGameVersion || isNullValue g.UpdateVersion)
-                                        orderBy g.Id
-                                        take 0 1
-                                }
-                                |> dbContext.GetConnection().SelectAsync<Game>
+                            do! calcResultIfNeeded (fun () ->
+                                task {
+                                    let! oldGames =
+                                        select {
+                                            for g in dbContext.Game do
+                                                where (isNotNullValue g.UpdateFinishedAt)
+                                                andWhere (g.UpdateVersion < currentGameVersion || isNullValue g.UpdateVersion)
+                                                orderBy g.Id
+                                                take 0 1
+                                        }
+                                        |> dbContext.GetConnection().SelectAsync<Game>
+                                        
+                                    return oldGames |> Seq.tryHead |> Option.map _.Id
+                                })
+                                
+                            do! calcResultIfNeeded (fun () ->
+                                task {
+                                    let! hotGameIds = getNewHotGameIds dbContext
+                                    
+                                    return hotGameIds |> Seq.tryHead
+                                })
                             
-                            let! hotGameIds = getNewHotGameIds dbContext
+                            do! calcResultIfNeeded (fun () ->
+                                task {
+                                    let! randomGameIds = getRandomGameSearch dbContext stoppingToken
+                                    
+                                    return randomGameIds |> Seq.tryHead
+                                })
                             
-                            let! randomGameIds = getRandomGameSearch dbContext stoppingToken
+                            do! calcResultIfNeeded (fun () ->
+                                task {
+                                    let! randomGameIds = getRandomGameSearch dbContext stoppingToken
+                                    
+                                    return randomGameIds |> Seq.tryHead
+                                })
                             
-                            return [
-                                unfinishedGames |> Seq.map _.Id
-                                oldGames |> Seq.map _.Id
-                                hotGameIds
-                                randomGameIds
-                            ] |> Seq.concat |> Seq.tryHead
+                            do! calcResultIfNeeded (fun () ->
+                                task {
+                                    let! oldestGameId =
+                                        select {
+                                            for g in dbContext.Game do
+                                                where (isNotNullValue g.UpdateFinishedAt)
+                                                orderBy g.UpdateFinishedAt
+                                                take 0 1
+                                        }
+                                        |> dbContext.GetConnection().SelectAsync<Game>
+                                    
+                                    return oldestGameId |> Seq.tryHead |> Option.map _.Id
+                                })
+                            
+                            return result
                         else
                             return None
                     }
