@@ -174,13 +174,6 @@ type GameIdleProcessor
                             
                             do! calcResultIfNeeded (fun () ->
                                 task {
-                                    let! randomGameIds = getRandomGameSearch dbContext stoppingToken
-                                    
-                                    return randomGameIds |> Seq.tryHead
-                                })
-                            
-                            do! calcResultIfNeeded (fun () ->
-                                task {
                                     let! oldestGameId =
                                         select {
                                             for g in dbContext.Game do
