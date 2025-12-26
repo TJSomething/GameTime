@@ -77,10 +77,11 @@ type GameIdleProcessor
                     randomGame
                     |> Seq.tryHead
                     |> Option.bind _.Title
+                    |> Option.map _.Split(" ")
+                    |> Option.map Seq.randomChoice
+                    |> Option.filter (fun word -> word.Length >= 3)
+                    |> Option.map _.Substring(0, 3)
                     |> Option.defaultValue "the"
-                    |> _.Split(" ")
-                    |> Seq.randomChoice
-                    |> _.Substring(0, 3)
                 
                 // Search BGG for that prefix
                 let! resultXml = fetcher.downloadXmlAsync $"https://boardgamegeek.com/xmlapi2/search?query={searchString}&type=boardgame"
