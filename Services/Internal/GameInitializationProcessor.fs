@@ -167,7 +167,8 @@ type GameInitializationProcessor
                             let! gameXml = fetchGame id
                             do! writeGameInfo dbContext id gameXml
                             let playerCountVotes = getPlayerCountVotes id gameXml
-                            do! writePlayerCountVotes dbContext playerCountVotes
+                            if playerCountVotes |> Seq.isEmpty |> not then
+                                do! writePlayerCountVotes dbContext playerCountVotes
                         with ex ->
                             jobTracker.CloseJob(id) |> ignore
                             raise (Exception($"Error in fetching game {id}", ex))
