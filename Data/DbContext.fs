@@ -2,6 +2,7 @@ namespace GameTime.Data
 
 open System
 open System.Data
+open Dapper
 open Dapper.FSharp.SQLite
 open GameTime.Data.Entities
 open Microsoft.Data.Sqlite
@@ -29,6 +30,7 @@ type DbContext() =
             let connStr = conf["sqliteConnectionString"]
             let newConn = new SqliteConnection(connStr)
             newConn.Open()
+            newConn.Execute("PRAGMA journal_mode = WAL;") |> ignore
             connection <- Some newConn
             newConn
 
