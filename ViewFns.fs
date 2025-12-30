@@ -38,7 +38,7 @@ let master (pathBase: string) (titleText: string) (content: XmlNode list) =
                                       "https://cf.geekdo-images.com/HZy35cmzmmyV9BarSuk6ug__small/img/gbE7sulIurZE_Tx8EQJXnZSKI6w=/fit-in/200x150/filters:strip_icc()/pic7779581.png" ] ] ] ] ]
 
 // Views
-let homeView (pathBase: string) (recentGames: Game seq) (bggToken: string) =
+let homeView (pathBase: string) (gameCount: int64) (playCount: int64) (recentGames: Game seq) (bggToken: string) =
     master
         pathBase
         "GameTime"
@@ -50,17 +50,20 @@ let homeView (pathBase: string) (recentGames: Game seq) (bggToken: string) =
               []
               (recentGames
                |> Seq.map (fun g ->
-                   li [] [ a [ _href $"game/{g.Id}" ] [
-                       match g.Title, g.YearPublished with
-                       | Some t, Some 0 | Some t, None -> str t
-                       | Some t, Some y -> str $"{t} ({y})"
-                       | None, _ -> str $"Game #{g.Id}"
-                   ] ])
+                   li
+                       []
+                       [ a
+                             [ _href $"game/{g.Id}" ]
+                             [ match g.Title, g.YearPublished with
+                               | Some t, Some 0
+                               | Some t, None -> str t
+                               | Some t, Some y -> str $"{t} ({y})"
+                               | None, _ -> str $"Game #{g.Id}" ] ])
                |> Seq.toList)
-          script [
-              _data "token" bggToken
-              _src $"{pathBase}/js/index.js"
-          ] [] ]
+          h2 [] [ str "Stats" ]
+          p [] [ str $"Games loaded: {gameCount}" ]
+          p [] [ str $"Plays loaded: {playCount}" ]
+          script [ _data "token" bggToken; _src $"{pathBase}/js/index.js" ] [] ]
 
 let renderTable (cells: string seq seq) =
     [ table
@@ -131,7 +134,7 @@ type Listing =
                        h2 [] [ str "Percentiles for play time (minutes)" ]
                        div [ _class "overflow-auto" ] (renderTable percentileTable)
                        h2 [] [ str "Plays per month" ]
-                       div [ _class "overflow-auto" ] (renderTable monthlyPlayTable)]
+                       div [ _class "overflow-auto" ] (renderTable monthlyPlayTable) ]
              | "Loading" ->
                  List.concat
                      [ [ h1 [] [ str title ] ]
