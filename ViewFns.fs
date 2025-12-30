@@ -38,60 +38,70 @@ let master (pathBase: string) (titleText: string) (content: XmlNode list) =
                                       "https://cf.geekdo-images.com/HZy35cmzmmyV9BarSuk6ug__small/img/gbE7sulIurZE_Tx8EQJXnZSKI6w=/fit-in/200x150/filters:strip_icc()/pic7779581.png" ] ] ] ] ]
 
 // Views
-let homeView (pathBase: string) (gameCount: int64) (recentGames: Game seq) (bggToken: string) =
-    master
-        pathBase
-        "GameTime"
-        [ p [] [ str "Search for a board game:" ]
-          input [ _type "search"; _id "search" ]
-          ul [ _id "results" ] []
-          h2 [] [ str "Recently loaded games" ]
-          ul
-              []
-              (recentGames
-               |> Seq.map (fun g ->
-                   li
-                       []
-                       [ a
-                             [ _href $"game/{g.Id}" ]
-                             [ match g.Title, g.YearPublished with
-                               | Some t, Some 0
-                               | Some t, None -> str t
-                               | Some t, Some y -> str $"{t} ({y})"
-                               | None, _ -> str $"Game #{g.Id}" ] ])
-               |> Seq.toList)
-          h2 [] [ str "Statistics" ]
-          p [] [ str $"Games loaded: {gameCount}" ]
-          script [ _data "token" bggToken; _src $"{pathBase}/js/index.js" ] [] ]
-
-let renderTable (cells: string seq seq) =
-    [ table
-          [ _class "striped" ]
-          [ thead
+type Home =
+    static let renderGameList (games: Game seq) =
+        games
+        |> Seq.map (fun g ->
+            li
                 []
-                [ tr
-                      []
-                      (seq {
-                          for header in Seq.head cells do
-                              yield (th [] [ str header ])
-                       }
-                       |> Seq.toList) ]
-            tbody
-                []
-                (seq {
-                    for row in Seq.tail cells do
-                        yield
-                            tr
-                                []
-                                (seq {
-                                    for cell in row do
-                                        yield td [] [ str cell ]
-                                 }
-                                 |> Seq.toList)
-                 }
-                 |> Seq.toList) ] ]
+                [ a
+                      [ _href $"game/{g.Id}" ]
+                      [ match g.Title, g.YearPublished with
+                        | Some t, Some 0
+                        | Some t, None -> str t
+                        | Some t, Some y -> str $"{t} ({y})"
+                        | None, _ -> str $"Game #{g.Id}" ] ])
+        |> Seq.toList
+        
+    static member Render
+        (
+            pathBase: string,
+            gameCount: int64,
+            recentGames: Game seq,
+            randomGames: Game seq,
+            bggToken: string) =
+        master
+            pathBase
+            "GameTime"
+            [ p [] [ str "Search for a board game:" ]
+              input [ _type "search"; _id "search" ]
+              ul [ _id "results" ] []
+              h2 [] [ str "Recently loaded games" ]
+              ul [] (renderGameList recentGames)
+              h2 [] [ str "Random favorites" ]
+              ul [] (renderGameList randomGames)
+              h2 [] [ str "Statistics" ]
+              p [] [ str $"Games loaded: {gameCount}" ]
+              script [ _data "token" bggToken; _src $"{pathBase}/js/index.js" ] [] ]
 
 type Listing =
+    static let renderTable (cells: string seq seq) =
+        [ table
+              [ _class "striped" ]
+              [ thead
+                    []
+                    [ tr
+                          []
+                          (seq {
+                              for header in Seq.head cells do
+                                  yield (th [] [ str header ])
+                           }
+                           |> Seq.toList) ]
+                tbody
+                    []
+                    (seq {
+                        for row in Seq.tail cells do
+                            yield
+                                tr
+                                    []
+                                    (seq {
+                                        for cell in row do
+                                            yield td [] [ str cell ]
+                                     }
+                                     |> Seq.toList)
+                     }
+                     |> Seq.toList) ] ]
+        
     static member Render
         (
             id: int,

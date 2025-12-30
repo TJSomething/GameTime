@@ -4,6 +4,7 @@ open System
 open System.Diagnostics.CodeAnalysis
 open System.Reflection
 
+[<CLIMutable>]
 type Game =
     { Id: int
       Title: string option
