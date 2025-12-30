@@ -23,22 +23,9 @@ type HomeController(dbContext: DbContext, config: AppConfig) =
                         count "*" "Value"
                 }
                 |> conn.SelectAsync<{| Value: int64 |}>
-
-            let! playCountResult =
-                select {
-                    for g in dbContext.Play do
-                        count "*" "Value"
-                }
-                |> conn.SelectAsync<{| Value: int64 |}>
                 
             let gameCount =
                 gameCountResult
-                |> Seq.tryHead
-                |> Option.map _.Value
-                |> Option.defaultValue -1
-                
-            let playCount =
-                playCountResult
                 |> Seq.tryHead
                 |> Option.map _.Value
                 |> Option.defaultValue -1
@@ -58,7 +45,7 @@ type HomeController(dbContext: DbContext, config: AppConfig) =
                     statusCode = 200,
                     contentType = "text/html",
                     content = (
-                        homeView pathBase gameCount playCount recentGames config.BggFrontendToken
+                        homeView pathBase gameCount recentGames config.BggFrontendToken
                         |> RenderView.AsString.htmlDocument)
                 )
         }
