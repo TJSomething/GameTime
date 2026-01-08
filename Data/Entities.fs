@@ -29,6 +29,7 @@ type PlayerCountVote =
       Recommended: int
       NotRecommended: int }
 
+[<CLIMutable>]
 type Play =
     { Id: int
       GameId: int
