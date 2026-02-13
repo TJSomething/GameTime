@@ -50,7 +50,7 @@ type XmlFetcher(logger: ILogger, config: AppConfig) =
                         let! rawXmlString = response.Content.ReadAsStringAsync()
                         let replacedXmlString = Regex.Replace(rawXmlString, @"[\x00-\x08\x0B\x0C\x0E-\x19]", "")
                         use xmlStream = new StringReader(replacedXmlString)
-                        let xmlReader = XmlReader.Create(xmlStream, xmlSettings)
+                        use xmlReader = XmlReader.Create(xmlStream, xmlSettings)
                         return Some(XDocument.Load(xmlReader))
                     | System.Net.HttpStatusCode.TooManyRequests ->
                         // Handle 429 errors by increasing the delay and retrying
