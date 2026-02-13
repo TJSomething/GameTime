@@ -1,11 +1,13 @@
 namespace GameTime.Services.Internal
 
 open System
+open System.IO
 open System.Net.Http
 open System.Net.Http.Headers
 open System.Text.RegularExpressions
 open System.Threading
 open System.Threading.Tasks
+open System.Xml
 open System.Xml.Linq
 open GameTime.Services
 open Microsoft.Extensions.Logging
