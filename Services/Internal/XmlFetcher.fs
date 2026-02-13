@@ -14,6 +14,8 @@ type XmlFetcher(logger: ILogger, config: AppConfig) =
     let mutable requestDelay = 1000
     let mutable lastRequestCompletion = DateTime.UnixEpoch
     let requestSemaphore = new SemaphoreSlim(1, 1)
+
+    let xmlSettings = XmlReaderSettings(CheckCharacters = false)
     let client =
         let c = new HttpClient()
         c.DefaultRequestHeaders.Authorization <- AuthenticationHeaderValue("Bearer", config.BggBackendToken)
@@ -43,17 +45,11 @@ type XmlFetcher(logger: ILogger, config: AppConfig) =
 
                     match response.StatusCode with
                     | System.Net.HttpStatusCode.OK ->
-                        let! rawXmlContent = response.Content.ReadAsStringAsync()
-
-                        // BGG doesn't escape ampersands correctly
-                        let xmlContent =
-                            Regex.Replace(
-                                rawXmlContent,
-                                "&(?!lt;|gt;|amp;|quot;|apos;|#[0-9]+;|#x[0-9a-fA-F]+;)",
-                                "&amp;"
-                            )
-
-                        return Some(XDocument.Parse(xmlContent))
+                        let! rawXmlString = response.Content.ReadAsStringAsync()
+                        let replacedXmlString = Regex.Replace(rawXmlString, @"[\x00-\x08\x0B\x0C\x0E-\x19]", "")
+                        use xmlStream = new StringReader(replacedXmlString)
+                        let xmlReader = XmlReader.Create(xmlStream, xmlSettings)
+                        return Some(XDocument.Load(xmlReader))
                     | System.Net.HttpStatusCode.TooManyRequests ->
                         // Handle 429 errors by increasing the delay and retrying
                         requestDelay <- requestDelay * 2
