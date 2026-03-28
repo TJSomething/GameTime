@@ -9,6 +9,7 @@ open FSharp.Stats
 
 open GameTime.Data
 open GameTime.Data.Entities
+open Microsoft.Data.Sqlite
 
 type PlayAmountStatsDraft =
     { UniquePlayerIds: int Set
@@ -220,28 +221,27 @@ type PlayTimePercentileTableJob
     
     member this.FetchAndProcessPlayPage () =
         task {
-            let! plays =
-                select {
-                    for p in db.Play do
-                        where (p.GameId = id)
-                        take playsProcessed 10000
-                }
-                |> db.GetConnection().SelectAsync<Play>
-             
-            if plays |> Seq.length > 0 then
-                for play in plays do
-                    let count = play.PlayerCount
-                    let index = playerCountToCurrentIndex[count]
-                    playerCountToTimes[count][index] <- play.Length |> float
-                    playerCountToCurrentIndex[count] <- index + 1
+            use command = db.GetConnection().CreateCommand()
+            command.CommandText <- "select PlayerCount, Length from Play where GameId = @Id"
+            let _ = command.Parameters.Add(SqliteParameter("@Id", id))
+            use reader = command.ExecuteReader()
+            
+            let mutable hasResult = reader.Read()
+            
+            while hasResult do
+                let count = reader.GetInt32(0)
+                let length = reader.GetInt32(1) |> float
+                let index = playerCountToCurrentIndex[count]
+                playerCountToTimes[count][index] <- length
+                playerCountToCurrentIndex[count] <- index + 1
+                
+                // Cumulative average
+                average <- (length + (float playsProcessed) * average) / ((float playsProcessed) + 1.0)
+                playsProcessed <- playsProcessed + 1
+                
+                hasResult <- reader.Read()
                     
-                    // Cumulative average
-                    average <- ((float play.Length) + (float playsProcessed) * average) / ((float playsProcessed) + 1.0)
-                    playsProcessed <- playsProcessed + 1
-                    
-                return true
-            else
-                return false
+            return false
         }
     
     member this.GetAverage () = average
