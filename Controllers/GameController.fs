@@ -142,13 +142,13 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                                 Some(timePerItem * (float itemsLeft))
 
                         ("Loading", t, g.FetchedPlays, g.TotalPlays, eta)
-                    | Some t, _, Some _ -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
+                    | Some t, _, Some _ -> ("Loaded", t, g.TotalPlays, g.TotalPlays, None)
                     | Some t, None, _ -> ("Loading", t, 0, 0, None)
                     | None, _, _ -> ("Initial", $"Game #{id}", 0, 0, None)
 
                 | Some g, None ->
                     match (g.Title, g.UpdateFinishedAt) with
-                    | Some t, Some _ -> ("Loaded", t, g.FetchedPlays, g.TotalPlays, None)
+                    | Some t, Some _ -> ("Loaded", t, g.TotalPlays, g.TotalPlays, None)
                     | None, Some _ -> ("Loaded", "Game not found", g.FetchedPlays, g.TotalPlays, None)
                     | _, None -> ("Initial", $"Game #{id}", 0, 0, None)
                 | _, None
@@ -157,6 +157,11 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
             let year = game |> Option.bind _.YearPublished
             let minPlayers = game |> Option.bind _.BoxMinPlayers
             let maxPlayers = game |> Option.bind _.BoxMaxPlayers
+            
+            let updatedAt =
+                game
+                |> Option.map _.UpdateTouchedAt.ToUniversalTime().ToString("o")
+                |> Option.defaultValue "Never"
 
             let view =
                 Listing.Render(
@@ -165,6 +170,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     status = status,
                     title = title,
                     year = year,
+                    updatedAt = updatedAt,
                     minPlayers = minPlayers,
                     maxPlayers = maxPlayers,
                     playCount = fetchedCount,

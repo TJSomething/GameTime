@@ -68,7 +68,7 @@ type Home =
               ul [ _id "results" ] []
               h2 [] [ str "Recently loaded games" ]
               ul [] (renderGameList recentGames)
-              h2 [] [ str "Random favorites" ]
+              h2 [] [ str "Random most played" ]
               ul [] (renderGameList randomGames)
               h2 [] [ str "Statistics" ]
               p [] [ str $"Games loaded: {gameCount}" ]
@@ -111,6 +111,7 @@ type Listing =
             year: int option,
             minPlayers: int option,
             maxPlayers: int option,
+            updatedAt: string,
             playCount: int,
             totalPlays: int,
             averagePlayTime: float,
@@ -143,7 +144,8 @@ type Listing =
                        h2 [] [ str "Percentiles for play time (minutes)" ]
                        div [ _class "overflow-auto" ] (renderTable percentileTable)
                        h2 [] [ str "Plays per month" ]
-                       div [ _class "overflow-auto" ] (renderTable monthlyPlayTable) ]
+                       div [ _class "overflow-auto" ] (renderTable monthlyPlayTable)
+                       p [] [ str $"Updated at: {updatedAt}" ] ]
              | "Loading" ->
                  List.concat
                      [ [ h1 [] [ str title ] ]
