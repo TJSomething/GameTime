@@ -16,6 +16,10 @@ open GameTime.Data
 open GameTime.Data.Entities
 open GameTime.XmlUtils
 
+type IdleFilterMode =
+    | OnlyNew
+    | NewOrStale
+
 type GameIdleProcessor
     (
         enqueue: int -> unit,
@@ -64,7 +68,7 @@ type GameIdleProcessor
                 TaskContinuationOptions.OnlyOnRanToCompletion)
             .Unwrap()
     
-    let filterExistingGameIds (dbContext: DbContext) (ids: int list) =
+    let filterExistingGameIds (dbContext: DbContext) (ids: int list) (mode: IdleFilterMode) =
         task {
             let! existingGames =
                 select {
@@ -72,10 +76,22 @@ type GameIdleProcessor
                     where (isIn game.Id ids)
                 } |> dbContext.GetConnection().SelectAsync<Game>
                 
-            return Seq.except (existingGames |> Seq.map _.Id) ids
+            match mode with
+            | OnlyNew ->
+                return Seq.except (existingGames |> Seq.map _.Id) ids
+            | NewOrStale ->
+                let existingRecentIds =
+                    existingGames
+                    |> Seq.filter (fun g ->
+                        match g.UpdateFinishedAt with
+                        | Some d -> DateTime.Now.AddDays(-90) < d
+                        | None -> false
+                    )
+                    |> Seq.map _.Id
+                return Seq.except existingRecentIds ids
         }
 
-    let getRandomGameWithSearch (dbContext: DbContext) (stoppingToken: CancellationToken) =
+    let getRandomGameWithSearch (dbContext: DbContext) (stoppingToken: CancellationToken) (mode: IdleFilterMode) =
         task {
             let mutable result = Seq.empty
             let mutable tries = 0
@@ -114,7 +130,7 @@ type GameIdleProcessor
                 let! resultXml = fetcher.downloadXmlAsync $"https://boardgamegeek.com/xmlapi2/search?query={searchString}&type=boardgame"
                 
                 let ids = extractGameIds resultXml
-                let! missingIds = filterExistingGameIds dbContext ids
+                let! missingIds = filterExistingGameIds dbContext ids mode
                 result <- missingIds |> Seq.randomShuffle
                 tries <- tries + 1
  
@@ -129,7 +145,7 @@ type GameIdleProcessor
     /// 3. Find a random username in that page.
     /// 4. Fetch a random page of plays for that user from BGG.
     /// 5. Take all game IDs on that page that aren't already in the DB.
-    let getRandomGameFromUserPlayHistory (dbContext: DbContext) (stoppingToken: CancellationToken) =
+    let getRandomGameFromUserPlayHistory (dbContext: DbContext) (stoppingToken: CancellationToken) (mode: IdleFilterMode) =
         task {
             let mutable result = Seq.empty
             let mutable tries = 0
@@ -221,18 +237,18 @@ join Play
                     |> Seq.collect (fun elem -> attrInt "." "objectid" elem |> Option.toList)
                     |> Seq.toList
                 
-                let! missingIds = filterExistingGameIds dbContext ids
+                let! missingIds = filterExistingGameIds dbContext ids mode
                 result <- missingIds |> Seq.randomShuffle
                 tries <- tries + 1
  
             return result
         }
     
-    let getNewHotGameIds(dbContext: DbContext) =
+    let getNewHotGameIds(dbContext: DbContext) (mode: IdleFilterMode) =
         task {
             let! hotnessXml = fetcher.downloadXmlAsync "https://boardgamegeek.com/xmlapi2/hot?type=boardgame"
             let hotIds = extractGameIds hotnessXml
-            let! missingHotIds = filterExistingGameIds dbContext hotIds
+            let! missingHotIds = filterExistingGameIds dbContext hotIds mode
             
             return missingHotIds
         }
@@ -295,21 +311,42 @@ join Play
                                 
                             do! calcResultIfNeeded (fun () ->
                                 task {
-                                    let! hotGameIds = getNewHotGameIds dbContext
+                                    let! hotGameIds = getNewHotGameIds dbContext OnlyNew
                                     
+                                    return hotGameIds |> Seq.tryHead
+                                })
+                                
+                            do! calcResultIfNeeded (fun () ->
+                                task {
+                                    let! hotGameIds = getNewHotGameIds dbContext NewOrStale
+
                                     return hotGameIds |> Seq.tryHead
                                 })
                             
                             do! calcResultIfNeeded (fun () ->
                                 task {
-                                    let! randomGameIds = getRandomGameFromUserPlayHistory dbContext stoppingToken
+                                    let! randomGameIds = getRandomGameFromUserPlayHistory dbContext stoppingToken OnlyNew
                                     
                                     return randomGameIds |> Seq.tryHead
                                 })
                             
                             do! calcResultIfNeeded (fun () ->
                                 task {
-                                    let! randomGameIds = getRandomGameWithSearch dbContext stoppingToken
+                                    let! randomGameIds = getRandomGameFromUserPlayHistory dbContext stoppingToken NewOrStale
+                                    
+                                    return randomGameIds |> Seq.tryHead
+                                })
+                            
+                            do! calcResultIfNeeded (fun () ->
+                                task {
+                                    let! randomGameIds = getRandomGameWithSearch dbContext stoppingToken OnlyNew
+                                    
+                                    return randomGameIds |> Seq.tryHead
+                                })
+                            
+                            do! calcResultIfNeeded (fun () ->
+                                task {
+                                    let! randomGameIds = getRandomGameWithSearch dbContext stoppingToken NewOrStale
                                     
                                     return randomGameIds |> Seq.tryHead
                                 })
