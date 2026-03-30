@@ -18,7 +18,7 @@ open Dapper
 open Dapper.FSharp.SQLite
 
 type private PlayStatus =
-    | FetchNextPage
+    | FetchNextPage of duplicatePlayCount: int64
     | FetchDone
     
 type private ParsedPlay =
@@ -100,7 +100,7 @@ type PlayFetchProcessor(
             return! fetcher.downloadXmlAsync url
         }
     
-    let writePlayPage (db: DbContext) (id: int) (xmlDoc: XDocument) =
+    let writePlayPage (db: DbContext) (id: int) (xmlDoc: XDocument) (prevStatus: PlayStatus) =
         task {
             let pagePlayCount = getPagePlayCount xmlDoc
             
@@ -138,15 +138,38 @@ type PlayFetchProcessor(
                     |> Seq.map _.Play
                     |> Seq.toList
             
+                let mutable duplicateCount =
+                    match prevStatus with
+                    | FetchNextPage c -> c
+                    | _ -> 0
+
                 if List.length plays > 0 then
+                    let newIds = plays |> Seq.map _.Id |> List.ofSeq
+                    let! overlapResult =
+                        select {
+                            for p in db.Play do
+                                count "*" "Value"
+                                where (isIn p.Id newIds)
+                        } |> db.GetConnection().SelectAsync<{| Value: int64 |}>
+                    
+                    let pageDupCount =
+                        overlapResult
+                        |> Seq.tryHead
+                        |> Option.map _.Value
+                        |> Option.defaultValue 0L
+                    
+                    duplicateCount <- duplicateCount + pageDupCount
+                    
                     let! _ =
                         insert {
                             into db.Play
                             values plays
                         } |> db.GetConnection().InsertOrReplaceAsync
+                    printfn $"[{DateTime.Now}] title {title} page {pagePlayCount} dups {duplicateCount} id {plays.Head.Id}"
+
                     ()
             
-                return FetchNextPage
+                return FetchNextPage(duplicatePlayCount = duplicateCount)
         }
         
     
@@ -221,7 +244,7 @@ type PlayFetchProcessor(
                     let! id = playJobChannel.ReadAsync(stoppingToken)
                     
                     let mutable page = 0
-                    let mutable status = FetchNextPage
+                    let mutable status = FetchNextPage 0L
                     
                     try
                         while (not stoppingToken.IsCancellationRequested && status <> FetchDone) do
@@ -229,7 +252,7 @@ type PlayFetchProcessor(
                             let mutable notDone = true
                             while notDone do
                                 try
-                                    let! newStatus = writePlayPage dbContext id playXml
+                                    let! newStatus = writePlayPage dbContext id playXml status
                                     page <- page + 1
                                     status <- newStatus
                                     notDone <- false
@@ -241,8 +264,13 @@ type PlayFetchProcessor(
                                     else
                                         do! Task.Delay 100
                             
-                            if status = FetchDone then
+                            match status with
+                            | FetchDone ->
                                 do! finalizePlays dbContext id
+                            | FetchNextPage c when c > 1000 ->
+                                status <- FetchDone
+                                do! finalizePlays dbContext id
+                            | _ -> ()
                     finally
                         // If there's a failure, we don't want the system to think the job's still active
                         jobTracker.CloseJob(id) |> ignore

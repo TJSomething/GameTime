@@ -73,13 +73,6 @@ type GameInitializationProcessor
                     }
                     |> db.GetConnection().UpdateAsync
 
-                let! _ =
-                    delete {
-                        for p in db.Play do
-                            where (p.GameId = id)
-                    }
-                    |> db.GetConnection().DeleteAsync
-
                 return ()
         }
 
