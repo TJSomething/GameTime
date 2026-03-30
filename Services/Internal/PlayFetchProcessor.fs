@@ -165,7 +165,6 @@ type PlayFetchProcessor(
                             into db.Play
                             values plays
                         } |> db.GetConnection().InsertOrReplaceAsync
-                    printfn $"[{DateTime.Now}] title {title} page {pagePlayCount} dups {duplicateCount} id {plays.Head.Id}"
 
                     ()
             
