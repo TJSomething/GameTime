@@ -117,6 +117,7 @@ type Listing =
             averagePlayTime: float,
             percentileTable: string seq seq,
             monthlyPlayTable: string seq seq,
+            playerCountRatingTable: string seq seq,
             timeLeft: TimeSpan option,
             otherGamesAheadOfThisOne: int option
         ) =
@@ -141,6 +142,8 @@ type Listing =
                    @ [ p [] [ a [ _href $"https://boardgamegeek.com/boardgame/{id}/" ] [ str "BGG page" ] ]
                        p [] [ str $"Plays: {playCount}" ]
                        p [] [ str $"Average play time: %.0f{averagePlayTime}" ]
+                       h2 [] [ str "Player counts" ]
+                       div [ _class "overflow-auto" ] (renderTable playerCountRatingTable)
                        h2 [] [ str "Percentiles for play time (minutes)" ]
                        div [ _class "overflow-auto" ] (renderTable percentileTable)
                        h2 [] [ str "Plays per month" ]

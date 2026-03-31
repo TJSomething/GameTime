@@ -95,6 +95,13 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                 }
                 |> conn.SelectAsync<Game>
 
+            let! playerCountRatingResults =
+                select {
+                    for g in dbContext.PlayerCountVote do
+                        where (g.GameId = id)
+                }
+                |> conn.SelectAsync<PlayerCountVote>
+
             let game = Seq.tryHead gameResult
             let gameOrder = gameFetcher.GetJobOrder(id)
 
@@ -158,6 +165,38 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
             let minPlayers = game |> Option.bind _.BoxMinPlayers
             let maxPlayers = game |> Option.bind _.BoxMaxPlayers
             
+            let playerCountRatingTable =
+                playerCountRatingResults
+                // Workaround the fact that I'm not upserting rating votes by filtering the row with the most votes
+                |> Seq.groupBy _.PlayerCount
+                |> Seq.map (fun (_, rs) -> rs |> Seq.maxBy (fun r -> r.Best + r.Recommended + r.NotRecommended))
+                // Null player count means more than any player cout listed
+                |> Seq.sortBy (fun p ->
+                    match p.PlayerCount with
+                    | Some n -> (0, n)
+                    | None -> (1, 0))
+                |> Seq.map (fun p ->
+                    let total = p.Best + p.NotRecommended + p.Recommended
+                    
+                    let playerCountText =
+                        p.PlayerCount
+                        |> Option.map _.ToString()
+                        |> Option.defaultValue "More"
+                        
+                    let ratingsCells =
+                        [p.Best; p.Recommended; p.NotRecommended]
+                        |> List.map (fun n ->
+                                    let percent = (float n) / (float total) * 100.0
+                                    $"%.1f{percent}%% (%i{n})")
+                        
+                    [
+                        [playerCountText]
+                        ratingsCells
+                        [$"{total}"]
+                    ]
+                    |> Seq.concat)
+                |> Seq.insertAt 0 [""; "Best"; "Recommended"; "Not recommended"; "Vote count"]
+            
             let updatedAt =
                 game
                 |> Option.map _.UpdateTouchedAt.ToUniversalTime().ToString("o")
@@ -179,7 +218,8 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                     timeLeft = timeLeft,
                     percentileTable = percentileTable,
                     monthlyPlayTable = monthlyPlayTable,
-                    otherGamesAheadOfThisOne = gameOrder
+                    otherGamesAheadOfThisOne = gameOrder,
+                    playerCountRatingTable = playerCountRatingTable
                 )
 
             return
