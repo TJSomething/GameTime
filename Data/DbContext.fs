@@ -5,6 +5,7 @@ open System.Data
 open Dapper
 open Dapper.FSharp.SQLite
 open GameTime.Data.Entities
+open GameTime.Services.Identity
 open Microsoft.Data.Sqlite
 open Microsoft.Extensions.Configuration
 
@@ -22,6 +23,7 @@ type DbContext() =
     member this.PlayerCountVote = table<PlayerCountVote>
     member this.PlayAmountStats = table<PlayAmountStats>
     member this.CacheItem = table<CacheItem>
+    member this.AppUser = table<AppUser>
 
     member this.GetConnection() =
         match connection with

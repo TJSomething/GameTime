@@ -1,5 +1,6 @@
 namespace GameTime.Services
 
 type AppConfig =
-    { BggFrontendToken: string
+    { PathBase: string
+      BggFrontendToken: string
       BggBackendToken: string }

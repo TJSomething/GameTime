@@ -15,7 +15,7 @@ open GameTime.Services
 open GameTime.Services.Internal.PlayStats
 open GameTime.ViewFns
 
-type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
+type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, config: AppConfig) =
     let getOrMakeGameStats (db: DbContext) (id: int) (gameModifiedDateTime: DateTime) =
         task {
             let key = PlayTimePercentileTableJob.GetCacheKey(id)
@@ -84,7 +84,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
                 return "No data available" |> Seq.singleton |> Seq.singleton
         }
 
-    member this.Listing(id: int, pathBase: string) =
+    member this.Listing(id: int) =
         task {
             use conn = dbContext.GetConnection()
 
@@ -205,7 +205,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService) =
             let view =
                 Listing.Render(
                     id = id,
-                    pathBase = pathBase,
+                    pathBase = config.PathBase,
                     status = status,
                     title = title,
                     year = year,

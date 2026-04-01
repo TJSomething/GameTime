@@ -74,6 +74,187 @@ type Home =
               p [] [ str $"Games loaded: {gameCount}" ]
               script [ _data "token" bggToken; _src $"{pathBase}/js/index.js" ] [] ]
 
+type Login =
+    static let renderGameList (games: Game seq) =
+        games
+        |> Seq.map (fun g ->
+            li
+                []
+                [ a
+                      [ _href $"game/{g.Id}" ]
+                      [ match g.Title, g.YearPublished with
+                        | Some t, Some 0
+                        | Some t, None -> str t
+                        | Some t, Some y -> str $"{t} ({y})"
+                        | None, _ -> str $"Game #{g.Id}" ] ])
+        |> Seq.toList
+        
+    static member RenderLoginForm
+        (
+            pathBase: string,
+            message: string
+        ) =
+        master
+            pathBase
+            "GameTime"
+            ([
+                (if message <> "" then
+                     [span [_id "message"] [article [_class "card"] [ str message ]]]
+                 else
+                     [span [_id "message"] []])
+                [
+                    template [_id "message-template"] [
+                        article [_class "card"] []
+                    ]
+                    h2 [] [ str "Login" ]
+                    form [_class "form-group"; _id "login-form"] [
+                        label [_class "form-label"; _for "username"] [
+                            str "Email"
+                        ]
+                        input [_class "form-input"; _type "text"; _name "username"; _id "username"]
+                        label [_class "form-label"; _for "password"] [
+                            str "Password"
+                        ]
+                        input [_class "form-input"; _type "password"; _name "password"; _id "password"]
+                        input [
+                            _type "submit"
+                            _id "login"
+                            _value "Login"
+                        ]
+                        input [
+                            _class "secondary"
+                            _type "submit"
+                            _id "create-account"
+                            _value "Create account"
+                        ]
+                    ]
+                    script [] [
+                        // language=javascript
+                        rawText $$"""
+"use strict";
+
+(() => {
+    // TODO: submit buttons
+    // TODO: change this page when logged in
+    // TODO: add stuff to do when logged in
+    const messageEl = document.getElementById("message");
+    const loginFormEl = document.getElementById("login-form");
+    const usernameEl = document.getElementById("username");
+    const passwordEl = document.getElementById("password");
+    const createBtnEl = document.getElementById("create-account");
+    const messageTemplateEl = document.getElementById("message-template");
+    
+    const showMessage = (message) => {
+        const clone = document.importNode(messageTemplateEl.content, true);
+        clone.firstChild.textContent = message;
+        messageEl.replaceChildren(clone);
+    };
+    
+    loginFormEl.addEventListener(
+        "submit",
+        (event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            
+            const username = usernameEl.value;
+            const password = passwordEl.value;
+            
+            if (!username || !password) {
+                showMessage("Missing username or password");
+                return;
+            }
+            
+            if (event.submitter === createBtnEl) {
+                (async () => {
+                    const resp =
+                        await fetch(
+                            "{{pathBase}}/register",
+                            {
+                                method: "post",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                    email: username,
+                                    password,
+                                })
+                            }
+                        );
+            
+                    if (!resp.ok) {
+                        showMessage(
+                            "There was something wrong with your username or password. Passwords must be 12 characters."
+                        );
+                        return;
+                    }
+                    
+                    showMessage(
+                        "Your account was created! Contact an admin to activate it."
+                    );
+                })();
+            } else {
+                (async () => {
+                    const resp =
+                        await fetch(
+                            "{{pathBase}}/login?useCookies=true",
+                            {
+                                method: "post",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                    email: username,
+                                    password,
+                                })
+                            }
+                        );
+            
+                    if (!resp.ok) {
+                        showMessage(
+                            "There was something wrong with your username or password."
+                        );
+                        return;
+                    }
+                    
+                    showMessage("You have logged in!");
+                    setTimeout(() => document.location.reload(), 1000);
+                })();
+            }
+        }
+    );
+})();
+"""
+                    ]
+                ]
+            ]
+            |> List.concat)
+
+    static member RenderAccount(pathBase: string, email: string) =
+        master
+            pathBase
+            "GameTime"
+            [
+                p [] [ str $"You're logged in! Your email address is {email}." ]
+                button [_id "logout"] [ str "Log out" ]
+                script [] [
+                    // language=javascript
+                    rawText $$"""
+(() => {
+    const logoutEl = document.getElementById("logout");
+    logoutEl.addEventListener(
+        "click",
+        () => {
+            (async () => {
+                await fetch("{{pathBase}}/logout", { method: "post" });
+                document.location.reload();
+            })();
+        }
+    );
+})();
+"""
+                ]
+            ]
+            
 type Listing =
     static let renderTable (cells: string seq seq) =
         [ table

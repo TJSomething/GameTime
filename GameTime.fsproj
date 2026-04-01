@@ -20,6 +20,7 @@
     <ItemGroup>
         <Compile Include="XmlUtils.fs" />
         <Compile Include="Data\Entities.fs" />
+        <Compile Include="Services\Identity\AppUser.fs" />
         <Compile Include="Data\Migrations.fs" />
         <Compile Include="Data\DbContext.fs" />
         <Compile Include="Data\DbCache.fs" />
@@ -32,8 +33,12 @@
         <Compile Include="Services\Internal\GameInitializationProcessor.fs" />
         <Compile Include="Services\Internal\GameIdleProcessor.fs" />
         <Compile Include="Services\GameFetcherService.fs" />
+        <Compile Include="Services\Identity\AppUserStore.fs" />
+        <Compile Include="Services\Identity\AppRoleStore.fs" />
+        <Compile Include="Services\Identity\FakeEmailSender.fs" />
         <Compile Include="Controllers\GameController.fs" />
         <Compile Include="Controllers\HomeController.fs" />
+        <Compile Include="Controllers\LoginController.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 

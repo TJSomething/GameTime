@@ -231,6 +231,48 @@ let migrate6 (conn: IDbConnection) =
         return ()
     }
     
+let migrate7 (conn: IDbConnection) =
+    task {
+        let! results =
+            select {
+                for m in MigrationTable do
+                where (m.Id = 7L)
+            }
+            |> conn.SelectAsync<Migration>
+
+        if results.Count() = 0 then
+            let! _ =
+                """
+                create table AppUser
+                (
+                    Id text primary key not null,
+                    Email text not null,
+                    PasswordHash text not null,
+                    EmailConfirmed boolean not null,
+                    Role text not null,
+                    CreatedAt text not null,
+                    UpdatedAt text not null
+                )
+                """
+                |> conn.ExecuteAsync
+                
+            let! _ =
+                """
+                create index user_by_email
+                on AppUser (Email)
+                """
+                |> conn.ExecuteAsync
+
+            let! _ =
+                insert {
+                    into MigrationTable
+                    value { Id = 7L }
+                } |> conn.InsertAsync
+            ()
+
+        return ()
+    }
+    
 let safeInit (conn: IDbConnection) =
     task {
         if isAlreadyInitialized |> not then
@@ -242,6 +284,7 @@ let safeInit (conn: IDbConnection) =
             do! migrate4 conn
             do! migrate5 conn
             do! migrate6 conn
+            do! migrate7 conn
             let! _ = "PRAGMA foreign_keys = ON;" |> conn.ExecuteAsync
             isAlreadyInitialized <- true
             OptionTypes.register ()

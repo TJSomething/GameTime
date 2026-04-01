@@ -14,7 +14,7 @@ open Dapper
 open Dapper.FSharp.SQLite
 
 type HomeController(dbContext: DbContext, config: AppConfig) =
-    member this.Index(pathBase: string) =
+    member this.Index() =
         task {
             use conn = dbContext.GetConnection()
 
@@ -123,7 +123,7 @@ join Game
                     contentType = "text/html",
                     content = (
                         Home.Render(
-                            pathBase = pathBase,
+                            pathBase = config.PathBase,
                             gameCount = gameCount,
                             recentGames = recentGames,
                             randomGames = randomGames,
