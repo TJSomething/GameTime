@@ -4,10 +4,13 @@ open System.Security.Claims
 open GameTime.Services
 open GameTime.ViewFns
 open Giraffe.ViewEngine
+open Microsoft.AspNetCore.Antiforgery
 open Microsoft.AspNetCore.Http
 
-type LoginController(config: AppConfig) =
+type LoginController(config: AppConfig, forgeryService: IAntiforgery) =
     member this.Form(context: HttpContext) =
+        let tokens = forgeryService.GetAndStoreTokens(context)
+        
         if context.User.Identity.IsAuthenticated then
             Results.Content(
                 statusCode = 200,
@@ -15,7 +18,8 @@ type LoginController(config: AppConfig) =
                 content = (
                     Login.RenderAccount(
                         pathBase = config.PathBase,
-                        email = context.User.FindFirstValue(ClaimTypes.Email)
+                        email = context.User.FindFirstValue(ClaimTypes.Email),
+                        antiforgeryToken = tokens.RequestToken
                     )
                     |> RenderView.AsString.htmlDocument)
             )
@@ -27,7 +31,8 @@ type LoginController(config: AppConfig) =
                 content = (
                     Login.RenderLoginForm(
                         pathBase = config.PathBase,
-                        message = if isLoggedOut then "Logged out successfully." else ""
+                        message = (if isLoggedOut then "Logged out successfully." else ""),
+                        antiforgeryToken = tokens.RequestToken
                     )
                     |> RenderView.AsString.htmlDocument)
             )

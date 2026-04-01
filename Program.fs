@@ -7,9 +7,11 @@ open System.Threading.Tasks
 open GameTime.Data
 open GameTime.Data.Migrations
 open GameTime.Services.Identity
+open Microsoft.AspNetCore.Antiforgery
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Identity
+open Microsoft.AspNetCore.Mvc
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
@@ -71,6 +73,8 @@ module Program =
             options.Cookie.HttpOnly <- true
             options.Cookie.IsEssential <- true)
         
+        builder.Services.AddAntiforgery(fun options -> options.HeaderName <- "X-XSRF-TOKEN")
+        
         builder.Services.AddMemoryCache(fun opt ->
             opt.SizeLimit <-
                 (configurationRoot["CacheSizeBytes"]
@@ -94,6 +98,8 @@ module Program =
 
         app.UseStaticFiles()
         
+        app.UseAntiforgery()
+        
         app.MapGet("/", Func<HomeController, Task<IResult>>(_.Index()))
 
         app.MapGet(
@@ -116,7 +122,20 @@ module Program =
             }))
         
         app.MapIdentityApi<AppUser>()
-        
+            .AddEndpointFilterFactory(fun filterFactoryContext next ->
+                let antiforgery = filterFactoryContext.ApplicationServices.GetRequiredService<IAntiforgery>()
+                
+                EndpointFilterDelegate(
+                    fun invocationContext ->
+                        task {
+                            let! isValid = antiforgery.IsRequestValidAsync(invocationContext.HttpContext)
+                            
+                            if isValid then
+                                return! next.Invoke(invocationContext)
+                            else
+                                return Results.Problem("CSRF token doesn't match", null, 403)
+                        } |> ValueTask<obj>))
+            
         using (app.Services.CreateScope()) (fun scope ->
             use db = scope.ServiceProvider.GetRequiredService<DbContext>()
             use conn = db.GetConnection()

@@ -92,7 +92,8 @@ type Login =
     static member RenderLoginForm
         (
             pathBase: string,
-            message: string
+            message: string,
+            antiforgeryToken: string
         ) =
         master
             pathBase
@@ -143,6 +144,7 @@ type Login =
     const passwordEl = document.getElementById("password");
     const createBtnEl = document.getElementById("create-account");
     const messageTemplateEl = document.getElementById("message-template");
+    const antiforgeryToken = "{{antiforgeryToken}}";
     
     const showMessage = (message) => {
         const clone = document.importNode(messageTemplateEl.content, true);
@@ -173,6 +175,7 @@ type Login =
                                 method: "post",
                                 headers: {
                                     "Content-Type": "application/json",
+                                    "X-XSRF-TOKEN": antiforgeryToken,
                                 },
                                 body: JSON.stringify({
                                     email: username,
@@ -201,6 +204,7 @@ type Login =
                                 method: "post",
                                 headers: {
                                     "Content-Type": "application/json",
+                                    "X-XSRF-TOKEN": antiforgeryToken,
                                 },
                                 body: JSON.stringify({
                                     email: username,
@@ -229,7 +233,11 @@ type Login =
             ]
             |> List.concat)
 
-    static member RenderAccount(pathBase: string, email: string) =
+    static member RenderAccount(
+        pathBase: string,
+        email: string,
+        antiforgeryToken: string
+    ) =
         master
             pathBase
             "GameTime"
@@ -245,7 +253,12 @@ type Login =
         "click",
         () => {
             (async () => {
-                await fetch("{{pathBase}}/logout", { method: "post" });
+                await fetch("{{pathBase}}/logout", {
+                    method: "post",
+                    headers: {
+                        "X-XSRF-TOKEN": "{{antiforgeryToken}}"
+                    }
+                });
                 document.location.reload();
             })();
         }
