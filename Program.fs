@@ -11,7 +11,6 @@ open Microsoft.AspNetCore.Antiforgery
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Identity
-open Microsoft.AspNetCore.Mvc
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
@@ -20,6 +19,8 @@ open Microsoft.Extensions.Primitives
 
 open GameTime.Controllers
 open GameTime.Services
+
+type MutList<'T> = System.Collections.Generic.List<'T>
 
 module Program =
     let exitCode = 0
@@ -113,6 +114,38 @@ module Program =
             Results.StatusCode(303)))
         
         app.MapGet("/login", Func<LoginController, HttpContext, IResult>(_.Form))
+       
+        app.MapPost("/report", Func<DbContext, HttpContext, Task<IResult>>(fun db context ->
+                match context.Request.Form.TryGetValue("query") with
+                | true, query when query.Count = 1 ->
+                    task {
+                        let command = db.GetConnection().CreateCommand()
+                        command.CommandText <- query
+                        
+                        use reader = command.ExecuteReader()
+                        
+                        let mutable hasResult = reader.Read()
+                        
+                        let rows = MutList<MutList<string>>()
+                        
+                        let header = MutList<string>()
+                        for i in 0 .. (reader.FieldCount - 1) do
+                             header.Add(reader.GetName(i))
+                        rows.Add(header)
+                                
+                        while hasResult do
+                            let row = Array.create<obj> reader.FieldCount null
+                            reader.GetValues(row)
+                            
+                            rows.Add(MutList(row |> Seq.ofArray |> Seq.map _.ToString()))
+                            
+                            hasResult <- reader.Read()
+                        
+                        return Results.Json(rows)
+                    }        
+                | _ -> Task.FromResult(Results.BadRequest())
+            ))
+            .RequireAuthorization()
         
         app.MapPost("/logout", Func<SignInManager<AppUser>, HttpContext, AppConfig, Task<IResult>>(fun signInManager context config ->
             task {

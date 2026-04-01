@@ -244,6 +244,10 @@ type Login =
             [
                 p [] [ str $"You're logged in! Your email address is {email}." ]
                 button [_id "logout"] [ str "Log out" ]
+                form [_action $"{pathBase}/report"; _method "post"] [
+                    textarea [_name "query"] []
+                    input [_type "submit"]
+                ]
                 script [] [
                     // language=javascript
                     rawText $$"""
