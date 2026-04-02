@@ -36,7 +36,7 @@ type AppUserStore(dbContext: DbContext) =
                 let! _ =
                     delete {
                         for u in UserTable do
-                            where (u.CreatedAt < expiry)
+                            where (u.CreatedAt < expiry && u.EmailConfirmed = false)
                     }
                     |> connection.DeleteAsync
                 
