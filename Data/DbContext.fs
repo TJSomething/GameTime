@@ -23,7 +23,9 @@ type DbContext() =
     member this.PlayerCountVote = table<PlayerCountVote>
     member this.PlayAmountStats = table<PlayAmountStats>
     member this.CacheItem = table<CacheItem>
-    member this.AppUser = table<AppUser>
+    member this.AppUser =
+        PreserveRecordFields<AppUser>
+        table<AppUser>
 
     member this.GetConnection() =
         match connection with

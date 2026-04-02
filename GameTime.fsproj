@@ -60,6 +60,7 @@
     <ItemGroup>
         <TrimmerRootAssembly Include="FSharp.Core" />
         <TrimmerRootAssembly Include="Dapper.FSharp" />
+        <TrimmerRootDescriptor Include="linker.xml" />
     </ItemGroup>
 
     <ItemGroup>

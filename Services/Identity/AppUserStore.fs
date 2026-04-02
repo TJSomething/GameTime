@@ -8,7 +8,7 @@ open Microsoft.AspNetCore.Identity
 open GameTime.Data
 
 type AppUserStore(dbContext: DbContext) =
-    let UserTable = table<AppUser>
+    let UserTable = dbContext.AppUser
     let connection = dbContext.GetConnection()
     
     let createUserWhenReady (user: AppUser) =
