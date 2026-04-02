@@ -103,7 +103,21 @@
                     }
 
                     showMessage("You have logged in!");
-                    setTimeout(() => document.location.reload(), 1000);
+                    
+                    const returnUrlParam = new URLSearchParams(window.location.search).get("ReturnUrl");
+                    const returnUrl =
+                        returnUrlParam ? new URL(pathBase + returnUrlParam, document.location.href) : null;
+                    
+                    const isReturnUrlLocal =
+                        returnUrl &&
+                        returnUrl.host === document.location.host &&
+                        returnUrl.protocol === document.location.protocol;
+                    
+                    if (isReturnUrlLocal) {
+                        setTimeout(() => { document.location.href = returnUrl.href; }, 1000);
+                    } else {
+                        setTimeout(() => document.location.reload(), 1000);
+                    }
                 })();
             }
         }
