@@ -11,6 +11,7 @@ open GameTime.Services.Identity
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Identity
+open Microsoft.AspNetCore.Mvc
 open Microsoft.AspNetCore.Routing
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
@@ -20,10 +21,11 @@ open Microsoft.Extensions.Primitives
 open GameTime.Controllers
 open GameTime.Services
 
-type MutList<'T> = System.Collections.Generic.List<'T>
-
 module Program =
     let exitCode = 0
+    
+    type AsDelegate<'Controller, 'Result> =
+        delegate of [<FromServices>] controller: 'Controller * context: HttpContext -> 'Result
 
     [<EntryPoint>]
     let main args =
@@ -34,13 +36,14 @@ module Program =
                 .AddJsonFile("settings.json", optional = true)
                 .AddEnvironmentVariables("GAMETIME_")
                 .Build()
+                
+        let PathBase =
+            Option.ofObj(configurationRoot.GetValue<string>("PathBase"))
+            |> Option.defaultValue ""
 
         builder.Services.AddSingleton<AppConfig>(fun _ ->
             let BggFrontendToken = configurationRoot.GetValue<string>("BggFrontendToken")
             let BggBackendToken = configurationRoot.GetValue<string>("BggBackendToken")
-            let PathBase =
-                Option.ofObj(configurationRoot.GetValue<string>("PathBase"))
-                |> Option.defaultValue ""
             ArgumentNullException.ThrowIfNullOrWhiteSpace(BggFrontendToken, "BggFrontendToken")
             ArgumentNullException.ThrowIfNullOrWhiteSpace(BggFrontendToken, "BggBackendToken")
             {
@@ -61,6 +64,10 @@ module Program =
             options.Password.RequireUppercase <- false
             options.Password.RequiredLength <- 12)
             .AddDefaultTokenProviders()
+        
+        builder.Services.ConfigureApplicationCookie(fun options ->
+            options.LoginPath <- $"{PathBase}/login"
+            options.LogoutPath <- $"{PathBase}/logout")
             
         builder.Services.AddTransient<IUserStore<AppUser>, AppUserStore>()
         builder.Services.AddTransient<IRoleStore<string>, AppRoleStore>()
@@ -89,6 +96,7 @@ module Program =
         builder.Services.AddScoped<HomeController>()
         builder.Services.AddScoped<GameController>()
         builder.Services.AddScoped<LoginController>()
+        builder.Services.AddScoped<ReportController>()
         
         let app = builder.Build()
 
@@ -113,39 +121,14 @@ module Program =
             context.Response.Headers.Location = StringValues($"{config.PathBase}/game/{id}")
             Results.StatusCode(303)))
         
-        app.MapGet("/login", Func<LoginController, HttpContext, IResult>(_.Form))
+        app.MapGet("/login", AsDelegate(fun (c: LoginController) -> c.Form))
        
-        app.MapPost("/report", Func<DbContext, HttpContext, Task<IResult>>(fun db context ->
-                match context.Request.Form.TryGetValue("query") with
-                | true, query when query.Count = 1 ->
-                    task {
-                        let command = db.GetConnection().CreateCommand()
-                        command.CommandText <- query
-                        
-                        use reader = command.ExecuteReader()
-                        
-                        let mutable hasResult = reader.Read()
-                        
-                        let rows = MutList<MutList<string>>()
-                        
-                        let header = MutList<string>()
-                        for i in 0 .. (reader.FieldCount - 1) do
-                             header.Add(reader.GetName(i))
-                        rows.Add(header)
-                                
-                        while hasResult do
-                            let row = Array.create<obj> reader.FieldCount null
-                            reader.GetValues(row)
-                            
-                            rows.Add(MutList(row |> Seq.ofArray |> Seq.map _.ToString()))
-                            
-                            hasResult <- reader.Read()
-                        
-                        return Results.Json(rows)
-                    }        
-                | _ -> Task.FromResult(Results.BadRequest())
-            ))
+        app.MapGet("/report", AsDelegate(fun (c: ReportController) -> c.ReportForm))
             .RequireAuthorization()
+       
+        app.MapPost("/report", AsDelegate(fun (c: ReportController) -> c.RunReport))
+            .RequireAuthorization()
+            .AddEndpointFilterFactory(AntiforgeryFilterFactory.Invoke)
         
         app.MapPost("/logout", Func<SignInManager<AppUser>, HttpContext, AppConfig, Task<IResult>>(fun signInManager context config ->
             task {

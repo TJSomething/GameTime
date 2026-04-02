@@ -22,7 +22,10 @@ type BaseView () =
                         [ nav
                               []
                               [ ul [] [ li [] [ strong [] [ str "GameTime" ] ] ]
-                                ul [] [ li [] [ a [ _href $"{pathBase}/" ] [ str "Home" ] ] ] ] ]
+                                ul [] [
+                                    li [] [ a [ _href $"{pathBase}/" ] [ str "Home" ] ]
+                                    li [] [ a [ _href $"{pathBase}/login" ] [ str "Admin" ] ]
+                                ] ] ]
                     main [ _class "container" ] content
                     footer
                         [ _class "container" ]

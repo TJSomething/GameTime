@@ -77,11 +77,8 @@ type LoginView =
             "GameTime"
             [
                 p [] [ str $"You're logged in! Your email address is {email}." ]
+                p [] [ a [ _href $"{pathBase}/report" ] [ str "Reports" ] ]
                 button [_id "logout"] [ str "Log out" ]
-                form [_action $"{pathBase}/report"; _method "post"] [
-                    textarea [_name "query"] []
-                    input [_type "submit"]
-                ]
                 script [] [
                     // language=javascript
                     rawText $$"""
