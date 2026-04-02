@@ -59,7 +59,7 @@ type ReportController(
                         content = (
                             ReportView.Render(
                                 pathBase = config.PathBase,
-                                antiforgeryToken = tokens.CookieToken,
+                                antiforgeryToken = tokens.RequestToken,
                                 antiforgeryFormField = tokens.FormFieldName,
                                 lastReportQuery = query,
                                 report = seqRows)
