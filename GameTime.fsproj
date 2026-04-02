@@ -19,12 +19,11 @@
 
     <ItemGroup>
         <Compile Include="XmlUtils.fs" />
+        <Compile Include="Data\AppUser.fs" />
         <Compile Include="Data\Entities.fs" />
-        <Compile Include="Services\Identity\AppUser.fs" />
         <Compile Include="Data\Migrations.fs" />
         <Compile Include="Data\DbContext.fs" />
         <Compile Include="Data\DbCache.fs" />
-        <Compile Include="ViewFns.fs" />
         <Compile Include="Services\AppConfig.fs" />
         <Compile Include="Services\Internal\XmlFetcher.fs" />
         <Compile Include="Services\Internal\PlayStats.fs" />
@@ -36,9 +35,14 @@
         <Compile Include="Services\Identity\AppUserStore.fs" />
         <Compile Include="Services\Identity\AppRoleStore.fs" />
         <Compile Include="Services\Identity\FakeEmailSender.fs" />
+        <Compile Include="Views\BaseView.fs" />
+        <Compile Include="Views\HomeView.fs" />
+        <Compile Include="Views\LoginView.fs" />
+        <Compile Include="Views\ListingView.fs" />
         <Compile Include="Controllers\GameController.fs" />
         <Compile Include="Controllers\HomeController.fs" />
         <Compile Include="Controllers\LoginController.fs" />
+        <Compile Include="Middleware\AntiforgeryFilterFactory.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 

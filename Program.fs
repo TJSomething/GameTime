@@ -6,8 +6,8 @@ open System
 open System.Threading.Tasks
 open GameTime.Data
 open GameTime.Data.Migrations
+open GameTime.Middleware
 open GameTime.Services.Identity
-open Microsoft.AspNetCore.Antiforgery
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Identity
@@ -155,19 +155,7 @@ module Program =
             }))
         
         app.MapIdentityApi<AppUser>()
-            .AddEndpointFilterFactory(fun filterFactoryContext next ->
-                let antiforgery = filterFactoryContext.ApplicationServices.GetRequiredService<IAntiforgery>()
-                
-                EndpointFilterDelegate(
-                    fun invocationContext ->
-                        task {
-                            let! isValid = antiforgery.IsRequestValidAsync(invocationContext.HttpContext)
-                            
-                            if isValid then
-                                return! next.Invoke(invocationContext)
-                            else
-                                return Results.Problem("CSRF token doesn't match", null, 403)
-                        } |> ValueTask<obj>))
+            .AddEndpointFilterFactory(AntiforgeryFilterFactory.Invoke)
             
         using (app.Services.CreateScope()) (fun scope ->
             use db = scope.ServiceProvider.GetRequiredService<DbContext>()

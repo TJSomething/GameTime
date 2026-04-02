@@ -1,5 +1,6 @@
 ﻿namespace GameTime.Controllers
 
+open GameTime.Views
 open Microsoft.AspNetCore.Http
 
 open Giraffe.ViewEngine
@@ -7,7 +8,6 @@ open Giraffe.ViewEngine
 open GameTime.Data
 open GameTime.Data.Entities
 open GameTime.Services
-open GameTime.ViewFns
 
 // This can't be opened before Data or the app crashes
 open Dapper
@@ -122,7 +122,7 @@ join Game
                     statusCode = 200,
                     contentType = "text/html",
                     content = (
-                        Home.Render(
+                        HomeView.Render(
                             pathBase = config.PathBase,
                             gameCount = gameCount,
                             recentGames = recentGames,

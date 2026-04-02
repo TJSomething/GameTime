@@ -4,6 +4,7 @@ open System
 open System.Globalization
 
 open System.Threading.Tasks
+open GameTime.Views
 open Microsoft.AspNetCore.Http
 
 open Dapper.FSharp.SQLite
@@ -13,7 +14,6 @@ open GameTime.Data.DbCache
 open GameTime.Data.Entities
 open GameTime.Services
 open GameTime.Services.Internal.PlayStats
-open GameTime.ViewFns
 
 type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, config: AppConfig) =
     let getOrMakeGameStats (db: DbContext) (id: int) (gameModifiedDateTime: DateTime) =
@@ -203,7 +203,7 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, confi
                 |> Option.defaultValue "Never"
 
             let view =
-                Listing.Render(
+                ListingView.Render(
                     id = id,
                     pathBase = config.PathBase,
                     status = status,
