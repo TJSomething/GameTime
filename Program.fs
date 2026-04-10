@@ -26,6 +26,9 @@ module Program =
     
     type AsDelegate<'Controller, 'Result> =
         delegate of [<FromServices>] controller: 'Controller * context: HttpContext -> 'Result
+    
+    type AsDelegate2<'Controller, 'Arg1, 'Result> =
+        delegate of [<FromServices>] controller: 'Controller * context: HttpContext * arg1: 'Arg1 -> 'Result
 
     [<EntryPoint>]
     let main args =
@@ -93,6 +96,9 @@ module Program =
         
         builder.Services.AddSingleton<GameFetcherService>()
         builder.Services.AddHostedService<GameFetcherService>(_.GetRequiredService<GameFetcherService>())
+        builder.Services.AddSingleton<ReportManager>()
+        builder.Services.AddSingleton<ReportProcessor>()
+        builder.Services.AddHostedService<ReportProcessor>(_.GetRequiredService<ReportProcessor>())
         builder.Services.AddScoped<HomeController>()
         builder.Services.AddScoped<GameController>()
         builder.Services.AddScoped<LoginController>()
@@ -124,6 +130,9 @@ module Program =
         app.MapGet("/login", AsDelegate(fun (c: LoginController) -> c.Form))
        
         app.MapGet("/report", AsDelegate(fun (c: ReportController) -> c.ReportForm))
+            .RequireAuthorization()
+            
+        app.MapGet("/report/{id}", AsDelegate2(fun (c: ReportController) context (id: Guid) -> c.WaitForReport(context, id)))
             .RequireAuthorization()
        
         app.MapPost("/report", AsDelegate(fun (c: ReportController) -> c.RunReport))

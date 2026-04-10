@@ -56,6 +56,14 @@ type CacheItem =
       Version: int
       Value: string }
 
+type Report =
+    { Id: Guid
+      CreatedAt: DateTime
+      UpdatedAt: DateTime
+      Status: string
+      Query: string
+      Result: string option }
+
 /// Reference record fields to ensure that entities property names can be reflected for queries
 let inline PreserveRecordFields<'T> =
     FSharp.Reflection.FSharpType.GetRecordFields(typeof<'T>, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)

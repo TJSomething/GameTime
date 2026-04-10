@@ -16,7 +16,7 @@ type DbContext() =
             .AddEnvironmentVariables("GAMETIME_")
             .Build()
 
-    let mutable connection: IDbConnection option = None
+    let mutable connection: SqliteConnection option = None
     
     member this.Game = table<Game>
     member this.Play = table<Play>
@@ -26,6 +26,7 @@ type DbContext() =
     member this.AppUser =
         PreserveRecordFields<AppUser>
         table<AppUser>
+    member this.Report = table<Report>
 
     member this.GetConnection() =
         match connection with

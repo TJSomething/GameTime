@@ -273,6 +273,46 @@ let migrate7 (conn: IDbConnection) =
         return ()
     }
     
+let migrate8 (conn: IDbConnection) =
+    task {
+        let! results =
+            select {
+                for m in MigrationTable do
+                where (m.Id = 8L)
+            }
+            |> conn.SelectAsync<Migration>
+
+        if results.Count() = 0 then
+            let! _ =
+                """
+                create table Report
+                (
+                    Id text primary key not null,
+                    CreatedAt text not null,
+                    UpdatedAt text not null,
+                    Status text not null,
+                    Query text not null,
+                    Result text null
+                )
+                """
+                |> conn.ExecuteAsync
+                
+            let! _ =
+                """
+                create index report_created_at
+                on Report (Status, CreatedAt)
+                """
+                |> conn.ExecuteAsync
+
+            let! _ =
+                insert {
+                    into MigrationTable
+                    value { Id = 8L }
+                } |> conn.InsertAsync
+            ()
+
+        return ()
+    }
 let safeInit (conn: IDbConnection) =
     task {
         if isAlreadyInitialized |> not then
@@ -285,6 +325,7 @@ let safeInit (conn: IDbConnection) =
             do! migrate5 conn
             do! migrate6 conn
             do! migrate7 conn
+            do! migrate8 conn
             let! _ = "PRAGMA foreign_keys = ON;" |> conn.ExecuteAsync
             isAlreadyInitialized <- true
             OptionTypes.register ()

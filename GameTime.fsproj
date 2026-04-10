@@ -35,6 +35,8 @@
         <Compile Include="Services\Identity\AppUserStore.fs" />
         <Compile Include="Services\Identity\AppRoleStore.fs" />
         <Compile Include="Services\Identity\FakeEmailSender.fs" />
+        <Compile Include="Services\ReportManager.fs" />
+        <Compile Include="Services\ReportProcessor.fs" />
         <Compile Include="Views\BaseView.fs" />
         <Compile Include="Views\HomeView.fs" />
         <Compile Include="Views\LoginView.fs" />
