@@ -313,6 +313,35 @@ let migrate8 (conn: IDbConnection) =
 
         return ()
     }
+    
+    
+let migrate9 (conn: IDbConnection) =
+    task {
+        let! results =
+            select {
+                for m in MigrationTable do
+                where (m.Id = 9L)
+            }
+            |> conn.SelectAsync<Migration>
+
+        if results.Count() = 0 then
+            let! _ =
+                """
+                create index player_count_vote_by_game
+                on PlayerCountVote (GameId)
+                """
+                |> conn.ExecuteAsync
+
+            let! _ =
+                insert {
+                    into MigrationTable
+                    value { Id = 9L }
+                } |> conn.InsertAsync
+            ()
+
+        return ()
+    }
+        
 let safeInit (conn: IDbConnection) =
     task {
         if isAlreadyInitialized |> not then
@@ -326,6 +355,7 @@ let safeInit (conn: IDbConnection) =
             do! migrate6 conn
             do! migrate7 conn
             do! migrate8 conn
+            do! migrate9 conn
             let! _ = "PRAGMA foreign_keys = ON;" |> conn.ExecuteAsync
             isAlreadyInitialized <- true
             OptionTypes.register ()
