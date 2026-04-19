@@ -105,22 +105,9 @@ type ReportProcessor(logger: ILogger<ReportProcessor>, serviceProvider: IService
                 use dbContext = scope.ServiceProvider.GetRequiredService<DbContext>()
 
                 try
-                    use queueTimeout = new CancellationTokenSource(1000)
-                    
-                    use combinedTokenSource =
-                        CancellationTokenSource.CreateLinkedTokenSource(queueTimeout.Token, cancellationToken)
+                    let! hasJob = reportManager.WaitToReadJob(cancellationToken)
                     
                     use conn = dbContext.GetConnection()
-                    
-                    let! hasJob =
-                        task {
-                            try
-                                let! result = reportManager.WaitToReadJob(combinedTokenSource.Token)
-                                return result
-                            with
-                            | :? OperationCanceledException ->
-                                return false
-                        }
                             
                     let! jobOpt =
                         if hasJob then
