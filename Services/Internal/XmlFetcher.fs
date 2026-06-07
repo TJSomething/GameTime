@@ -85,7 +85,7 @@ type XmlFetcher(logger: ILogger, config: AppConfig) =
                     | Some success -> return success
                     | None -> return! go ()
                 with ex ->
-                    logger.LogError(ex, "Unexpected error fetching")
+                    logger.LogError(ex, "Unexpected error fetching {Url}", url)
                     lastRequestCompletion <- DateTime.Now
                     release ()
                     return! go ()
