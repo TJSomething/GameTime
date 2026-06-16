@@ -48,7 +48,7 @@ type XmlFetcher(logger: ILogger, config: AppConfig) =
                     match response.StatusCode with
                     | System.Net.HttpStatusCode.OK ->
                         let! rawXmlString = response.Content.ReadAsStringAsync()
-                        let replacedXmlString = Regex.Replace(rawXmlString, @"[\x00-\x08\x0B\x0C\x0E-\x19\xFFFE\xFFFF]", "")
+                        let replacedXmlString = Regex.Replace(rawXmlString, @"[\x00-\x08\x0B\x0C\x0E-\x19\uFFFE\uFFFF]", "")
                         use xmlStream = new StringReader(replacedXmlString)
                         use xmlReader = XmlReader.Create(xmlStream, xmlSettings)
                         return Some(XDocument.Load(xmlReader))
