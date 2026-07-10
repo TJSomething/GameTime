@@ -6,14 +6,18 @@ on [BoardGameGeek](https://boardgamegeek.com) and calculates the percentiles for
 ASP.NET is used in minimal API mode using [Giraffe.ViewEngine](https://giraffe.wiki/view-engine) to keep the artifact
 size down. [Dapper.FSharp](https://github.com/Dzoukr/Dapper.FSharp) is used with SQLite for persistence.
 
+Styling is done with [Pico CSS](https://picocss.com/) because it gives me
+pretty decent UI without a build or using too much bandwidth.
+
 Deployment is done to Fly.io using Make and Docker in [the
 cubes-in-space](https://github.com/TJSomething/cubes-in-space/), which deploys this
 app to https://cubesin.space/gametime/, behind Nginx.
 
+## Architecture
+
 GameTime asynchronously fetches games in the background in response to user
 requests. When there are no games queued, it uses the BGG API to find games
 that haven't been loaded or are out of date.
-
 
 ```mermaid
 flowchart TD
@@ -43,6 +47,8 @@ to the log, where a server admin can trigger it. This gives me bootstrapped
 closed account registration without needing to build any UI or permission
 system for it. I didn't really want to build that much functionality when it's
 unlikely I'll need more than one account.
+
+## Configuration
 
 Application-specific settings are set with settings.json or with the `GAMETIME_` environment variable prefix:
 
