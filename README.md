@@ -9,9 +9,9 @@ size down. [Dapper.FSharp](https://github.com/Dzoukr/Dapper.FSharp) is used with
 Styling is done with [Pico CSS](https://picocss.com/) because it gives me
 pretty decent UI without a build or using too much bandwidth.
 
-Deployment is done to Fly.io using Make and Docker in [the
-cubes-in-space](https://github.com/TJSomething/cubes-in-space/), which deploys this
-app to https://cubesin.space/gametime/, behind Nginx.
+Deployment is done to Fly.io using Make and Docker in [the cubes-in-space
+repo](https://github.com/TJSomething/cubes-in-space/), which deploys this app
+to https://cubesin.space/gametime/, behind Nginx.
 
 ## Architecture
 
