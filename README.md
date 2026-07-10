@@ -34,9 +34,20 @@ flowchart TD
   end
 ```
 
+There is also separately the `ReportManager` and `ReportProcessor` services,
+which are used to run long-running SQL queries in the background. Since this is
+plausibly dangerous, this feature is authenticated. Account creation,
+authorization, and authentication is done with ASP.NET's built-in identity
+providers, but `FakeEmailSender` is used to print the account activation link
+to the log, where a server admin can trigger it. This gives me bootstrapped
+closed account registration without needing to build any UI or permission
+system for it. I didn't really want to build that much functionality when it's
+unlikely I'll need more than one account.
+
 Application-specific settings are set with settings.json or with the `GAMETIME_` environment variable prefix:
 
 - `sqliteConnectionString`: a connection string for SQLite (default: `Data Source=GameTime.db;Foreign Keys=True`)
 - `PathBase`: the base path for URLs (default is the empty string)
+- `CacheSizeBytes`: the size of the cache in bytes, used primarily for authentication
 - `BggFrontendToken`: the token for the frontend to call BGG
 - `BggBackendToken`: the token for the backend to call BGG
