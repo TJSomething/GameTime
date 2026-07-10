@@ -11,7 +11,7 @@ pretty decent UI without a build or using too much bandwidth.
 
 Deployment is done to Fly.io using Make and Docker in [the cubes-in-space
 repo](https://github.com/TJSomething/cubes-in-space/), which deploys this app
-to https://cubesin.space/gametime/, behind Nginx.
+to https://cubesin.space/gametime/, behind Haproxy.
 
 ## Architecture
 
