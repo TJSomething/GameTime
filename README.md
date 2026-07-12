@@ -24,7 +24,7 @@ flowchart TD
   User@{ shape: trap-t, label: "User request" } --> GC
   GC[GameController] --user-requested game--> GQ@{ shape: das, label: "Game queue" }
   Idle[GameIdleProcessor] --game found via API--> GQ
-  GameInit --processed game--> PQ@{ shape: das, label: "Play queue" }
+  GameInit --processed game ID--> PQ@{ shape: das, label: "Play queue" }
   GQ --> GameInit[GameInitializationProcessor] --initial metadata--> DB[(Database)]
   PQ --> PlayFetch[PlayFetchProcessor]
   PlayFetch --loaded plays\nand play statistics--> DB
@@ -37,6 +37,11 @@ flowchart TD
     PlayFetch
   end
 ```
+
+There are separate queues for fetching games and plays because fetching plays
+can take a lot longer than fetching the game's metadata. The metadata gets
+fetched in order to populate a progress screen, which can report approximately
+how long it will be before a given game will have statistics ready.
 
 There is also separately the `ReportManager` and `ReportProcessor` services,
 which are used to run long-running SQL queries in the background. Since this is
