@@ -17,28 +17,19 @@ to https://cubesin.space/gametime/, behind Haproxy.
 
 GameTime asynchronously fetches games in the background in response to user
 requests. When there are no games queued, it uses the BGG API to find games
-that haven't been loaded or are out of date.
+that haven't been loaded or are out of date. This is triggered by either
+the `GameIdleProcessor` or the `GameController` adding a game to the
+`GameInitializationProcessor`'s queue.
 
 ```mermaid
 sequenceDiagram
-    participant GameController
-    participant GameIdleProcessor
     participant ActiveJobTracker
     participant GameInitializationProcessor
     participant PlayFetchProcessor
     participant Database@{ "type" : "database" }
     participant BGG@{ "type": "boundary" } as BGG API
 
-    alt when user requests new game
-        GameController->>GameInitializationProcessor: User requested game ID
-    else once per minute
-        GameIdleProcessor->>ActiveJobTracker: get active job count
-        ActiveJobTracker->>GameIdleProcessor: number of active jobs
-        opt if no job is active
-            GameIdleProcessor->>GameInitializationProcessor: game found via API
-        end
-    end
-
+    GameInitializationProcessor->>GameInitializationProcessor: get game ID from queue
     GameInitializationProcessor->>ActiveJobTracker: note job started for ID
     GameInitializationProcessor->>BGG: game metadata
     BGG->>GameInitializationProcessor: game metadata
