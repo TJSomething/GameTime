@@ -20,22 +20,43 @@ requests. When there are no games queued, it uses the BGG API to find games
 that haven't been loaded or are out of date.
 
 ```mermaid
-flowchart TD
-  User@{ shape: trap-t, label: "User request" } --> GC
-  GC[GameController] --user-requested game--> GQ@{ shape: das, label: "Game queue" }
-  Idle[GameIdleProcessor] --game found via API--> GQ
-  GameInit --processed game ID--> PQ@{ shape: das, label: "Play queue" }
-  GQ --> GameInit[GameInitializationProcessor] --initial metadata--> DB[(Database)]
-  PQ --> PlayFetch[PlayFetchProcessor]
-  PlayFetch --loaded plays\nand play statistics--> DB
-  
-  subgraph GameFetcherService
-    Idle
-    GameInit
-    GQ
-    PQ
-    PlayFetch
-  end
+sequenceDiagram
+    participant GameController
+    participant GameIdleProcessor
+    participant ActiveJobTracker
+    participant GameInitializationProcessor
+    participant PlayFetchProcessor
+    participant Database@{ "type" : "database" }
+    participant BGG@{ "type": "boundary" } as BGG API
+
+    alt when user requests new game
+        GameController->>GameInitializationProcessor: User requested game ID
+    else once per minute
+        GameIdleProcessor->>ActiveJobTracker: get active job count
+        ActiveJobTracker->>GameIdleProcessor: number of active jobs
+        opt if no job is active
+            GameIdleProcessor->>GameInitializationProcessor: game found via API
+        end
+    end
+
+    GameInitializationProcessor->>ActiveJobTracker: note job started for ID
+    GameInitializationProcessor->>BGG: game metadata
+    BGG->>GameInitializationProcessor: game metadata
+    GameInitializationProcessor->>Database: game metadata
+    GameInitializationProcessor->>PlayFetchProcessor: game ID
+    loop until an empty page
+        PlayFetchProcessor->>BGG: request plays
+        BGG->>PlayFetchProcessor: plays
+        PlayFetchProcessor->>Database: plays
+    end
+    PlayFetchProcessor->>Database: start play time only query
+    loop until query is done
+        Database->>PlayFetchProcessor: get time
+        PlayFetchProcessor->>Database: advance cursor
+    end
+    PlayFetchProcessor->>Database: insert play time stats
+    PlayFetchProcessor->>Database: update game to done
+    PlayFetchProcessor->>ActiveJobTracker: close job for ID
 ```
 
 There are separate queues for fetching games and plays because fetching plays
