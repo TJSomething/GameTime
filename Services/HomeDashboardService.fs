@@ -64,6 +64,8 @@ type HomeDashboardService(serviceProvider: IServiceProvider, logger: ILogger<Hom
     
     member private this.RefreshReports (stoppingToken: CancellationToken) =
         task {
+            logger.LogInformation(GameListReport.IsSerializable)
+            logger.LogInformation(GameCountReport.IsSerializable)
             while (not stoppingToken.IsCancellationRequested) do
                 try
                     do! jobTrigger.Reader.ReadAsync(stoppingToken)

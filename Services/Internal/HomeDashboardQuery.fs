@@ -10,10 +10,10 @@ open Dapper.FSharp.SQLite
 type GameListReport =
     { Games: Game seq }
     with
-    static member IsSerializable = PreserveRecordFields<GameListReport>
+    static member IsSerializable = RecordFields<GameListReport>
 type GameCountReport = { Count: int64 }
     with
-    static member IsSerializable = PreserveRecordFields<GameCountReport>
+    static member IsSerializable = RecordFields<GameCountReport>
 
 type HomeDashboardQuery(dbContext: DbContext) =
     member this.gameCount () =

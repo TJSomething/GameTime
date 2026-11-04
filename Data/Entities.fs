@@ -70,3 +70,12 @@ let inline PreserveRecordFields<^T> =
     if fields = null || fields.Length = 0 then
         raise (Exception($"Could not initialize instance of {typeof<^T>.FullName}"))
     ()
+    
+let inline RecordFields<^T> =
+    let fields = FSharp.Reflection.FSharpType.GetRecordFields(typeof<^T>, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)
+    if fields = null || fields.Length = 0 then
+        raise (Exception($"Could not initialize instance of {typeof<^T>.FullName}"))
+    let names =
+        fields
+        |> Array.map _.Name
+    String.Join(",", names)
