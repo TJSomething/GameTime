@@ -55,7 +55,7 @@ module Program =
                         FetchedPlays = 3
                         TotalPlays = 3
                     }] }, typeof<GameListReport>, DbCacheJsonSerializerOptions)
-        GameListReport.IsSerializable
+        PreserveRecordFields<Game>
         printfn $"%s{typeof<Game>.FullName}"
         printfn $"%s{str}"
             
