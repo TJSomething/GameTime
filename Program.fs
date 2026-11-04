@@ -38,6 +38,7 @@ module Program =
     let main args =
         printfn $"%s{JsonSerializer.Serialize({ Count = 2L }, typeof<GameCountReport>, DbCacheJsonSerializerOptions)}"
         PreserveRecordFields<Game>
+        PreserveRecordFields<GameListReport>
         printfn $"%s{typeof<Game>.FullName}"
         let str =
             JsonSerializer.Serialize({ Games = [{
