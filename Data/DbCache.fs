@@ -30,7 +30,6 @@ let inline addToCache<'T> (dbContext: DbContext) key version (newItem: 'T)=
 
 let inline getOrCreateFromCache<'T> (dbContext: DbContext) (key: string) (version: int) (value: unit -> Task<'T>) =
     task {
-        PreserveRecordFields<'T>
         let conn = dbContext.GetConnection()
         
         let! existingItemResult =

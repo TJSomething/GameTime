@@ -65,8 +65,7 @@ type Report =
       Result: string option }
 
 /// Reference record fields to ensure that entities property names can be reflected for queries
-let inline PreserveRecordFields<^T> =
-    let fields = FSharp.Reflection.FSharpType.GetRecordFields(typeof<^T>, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)
-    if fields = null || fields.Length = 0 then
-        raise (Exception($"Could not initialize instance of {typeof<^T>.FullName}"))
-    ()
+let inline PreserveRecordFields<'T> =
+    FSharp.Reflection.FSharpType.GetRecordFields(typeof<'T>, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)
+    |> ignore
+ 

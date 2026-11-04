@@ -3,16 +3,11 @@ namespace GameTime
 #nowarn "20"
 
 open System
-open System.Diagnostics.CodeAnalysis
-open System.Text.Json
 open System.Threading.Tasks
-open GameTime.Data.DbCache
 open GameTime.Data
-open GameTime.Data.Entities
 open GameTime.Data.Migrations
 open GameTime.Middleware
 open GameTime.Services.Identity
-open GameTime.Services.Internal
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Identity
@@ -36,32 +31,7 @@ module Program =
         delegate of [<FromServices>] controller: 'Controller * context: HttpContext * arg1: 'Arg1 -> 'Result
 
     [<EntryPoint>]
-    [<DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof<Game>)>]
     let main args =
-        printfn $"%s{JsonSerializer.Serialize({ Count = 2L }, typeof<GameCountReport>, DbCacheJsonSerializerOptions)}"
-        PreserveRecordFields<Game>
-        PreserveRecordFields<GameListReport>
-        printfn $"%s{typeof<Game>.FullName}"
-        let str =
-            JsonSerializer.Serialize({
-                        Title = Some "Ra"
-                        Id = 2
-                        YearPublished = Some 1999
-                        BoxPlayTime = Some 30
-                        BoxMinPlayTime = Some 30
-                        BoxMaxPlayTime = Some 30
-                        BoxMinPlayers = Some 30
-                        BoxMaxPlayers = Some 30
-                        AddedAt = DateTime.Now
-                        UpdateStartedAt = None
-                        UpdateTouchedAt = DateTime.Now
-                        UpdateFinishedAt = None
-                        UpdateVersion = Some 2
-                        FetchedPlays = 3
-                        TotalPlays = 3
-                    }, typeof<Game>, DbCacheJsonSerializerOptions)
-        printfn $"%s{str}"
-            
         let builder = WebApplication.CreateSlimBuilder(args)
         
         let configurationRoot =
@@ -124,8 +94,6 @@ module Program =
                     |> Option.defaultValue 100_000_000L
                     |> Nullable))
         
-        builder.Services.AddSingleton<HomeDashboardService>()
-        builder.Services.AddHostedService<HomeDashboardService>(_.GetRequiredService<HomeDashboardService>())
         builder.Services.AddSingleton<GameFetcherService>()
         builder.Services.AddHostedService<GameFetcherService>(_.GetRequiredService<GameFetcherService>())
         builder.Services.AddSingleton<ReportManager>()
