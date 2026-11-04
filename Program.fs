@@ -3,11 +3,14 @@ namespace GameTime
 #nowarn "20"
 
 open System
+open System.Text.Json
 open System.Threading.Tasks
+open GameTime.Data.DbCache
 open GameTime.Data
 open GameTime.Data.Migrations
 open GameTime.Middleware
 open GameTime.Services.Identity
+open GameTime.Services.Internal
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Identity
@@ -32,6 +35,8 @@ module Program =
 
     [<EntryPoint>]
     let main args =
+        printfn $"%s{JsonSerializer.Serialize({ Count = 2L }, typeof<GameCountReport>, DbCacheJsonSerializerOptions)}"
+            
         let builder = WebApplication.CreateSlimBuilder(args)
         
         let configurationRoot =
