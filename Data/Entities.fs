@@ -69,7 +69,12 @@ let inline PreserveRecordFields<'T> =
     FSharp.Reflection.FSharpType.GetRecordFields(typeof<'T>, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)
     |> ignore
  
+ 
 type SerializableRecordAttribute(t: Type) =
     inherit Attribute()
-    member val RecordFields =
-        FSharp.Reflection.FSharpType.GetRecordFields(t, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)
+    let fields =
+        let fields = FSharp.Reflection.FSharpType.GetRecordFields(t, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)
+        if fields = null || fields.Length = 0 then
+            raise (Exception($"Could not initialize instance of {t.FullName}"))
+        fields
+    member val RecordFields = fields
