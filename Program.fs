@@ -154,7 +154,7 @@ module Program =
         using (app.Services.CreateScope()) (fun scope ->
             use db = scope.ServiceProvider.GetRequiredService<DbContext>()
             use conn = db.GetConnection()
-            safeInit conn)
+            MigrationRunner.safeInit conn)
 
         app.Run()
 
