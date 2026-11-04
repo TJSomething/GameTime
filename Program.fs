@@ -3,6 +3,7 @@ namespace GameTime
 #nowarn "20"
 
 open System
+open System.Diagnostics.CodeAnalysis
 open System.Text.Json
 open System.Threading.Tasks
 open GameTime.Data.DbCache
@@ -35,6 +36,7 @@ module Program =
         delegate of [<FromServices>] controller: 'Controller * context: HttpContext * arg1: 'Arg1 -> 'Result
 
     [<EntryPoint>]
+    [<DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof<Game>)>]
     let main args =
         printfn $"%s{JsonSerializer.Serialize({ Count = 2L }, typeof<GameCountReport>, DbCacheJsonSerializerOptions)}"
         PreserveRecordFields<Game>
