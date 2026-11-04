@@ -7,6 +7,7 @@ open GameTime.Data.Entities
 open Dapper
 open Dapper.FSharp.SQLite
 
+[<CLIMutable>]
 type GameListReport = { Games: Game seq }
 
 type HomeDashboardQuery(dbContext: DbContext) =

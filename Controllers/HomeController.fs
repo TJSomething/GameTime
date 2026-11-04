@@ -9,10 +9,13 @@ open Giraffe.ViewEngine
 
 open GameTime.Data
 open GameTime.Services
+open Microsoft.Extensions.Logging
 
-type HomeController(dbContext: DbContext, config: AppConfig) =
+type HomeController(dbContext: DbContext, config: AppConfig, logger: ILogger<HomeController>) =
     member this.Index() =
         task {
+            logger.LogInformation("count")
+            
             let! gameCount =
                 getOrCreateFromCache
                     dbContext
@@ -20,6 +23,7 @@ type HomeController(dbContext: DbContext, config: AppConfig) =
                     HomeDashboardService.CACHE_VERSION
                     (fun () -> HomeDashboardQuery(dbContext).gameCount())
             
+            logger.LogInformation("recent")
             let! recentGames =
                 getOrCreateFromCache
                     dbContext
@@ -27,6 +31,7 @@ type HomeController(dbContext: DbContext, config: AppConfig) =
                     HomeDashboardService.CACHE_VERSION
                     (fun () -> HomeDashboardQuery(dbContext).recentGames())
             
+            logger.LogInformation("random")
             let! randomGames =
                 getOrCreateFromCache
                     dbContext
