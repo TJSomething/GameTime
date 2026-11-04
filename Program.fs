@@ -41,7 +41,7 @@ module Program =
         PreserveRecordFields<GameListReport>
         printfn $"%s{typeof<Game>.FullName}"
         let str =
-            JsonSerializer.Serialize({ Games = [{
+            JsonSerializer.Serialize({
                         Title = Some "Ra"
                         Id = 2
                         YearPublished = Some 1999
@@ -57,7 +57,7 @@ module Program =
                         UpdateVersion = Some 2
                         FetchedPlays = 3
                         TotalPlays = 3
-                    }] }, typeof<GameListReport>, DbCacheJsonSerializerOptions)
+                    }, typeof<Game>, DbCacheJsonSerializerOptions)
         printfn $"%s{str}"
             
         let builder = WebApplication.CreateSlimBuilder(args)
