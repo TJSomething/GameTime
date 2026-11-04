@@ -69,3 +69,7 @@ let inline PreserveRecordFields<'T> =
     FSharp.Reflection.FSharpType.GetRecordFields(typeof<'T>, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)
     |> ignore
  
+type SerializableRecordAttribute(t: Type) =
+    inherit Attribute()
+    member val RecordFields =
+        FSharp.Reflection.FSharpType.GetRecordFields(t, BindingFlags.Public ||| BindingFlags.Instance ||| BindingFlags.NonPublic)

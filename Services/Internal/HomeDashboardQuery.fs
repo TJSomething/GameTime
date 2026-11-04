@@ -7,7 +7,9 @@ open GameTime.Data.Entities
 open Dapper
 open Dapper.FSharp.SQLite
 
+[<SerializableRecord(typedefof<GameListReport>)>]
 type GameListReport = { Games: Game seq }
+[<SerializableRecord(typedefof<GameCountReport>)>]
 type GameCountReport = { Count: int64 }
 
 type HomeDashboardQuery(dbContext: DbContext) =
