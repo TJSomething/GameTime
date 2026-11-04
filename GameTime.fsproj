@@ -31,6 +31,8 @@
         <Compile Include="Services\Internal\PlayFetchProcessor.fs" />
         <Compile Include="Services\Internal\GameInitializationProcessor.fs" />
         <Compile Include="Services\Internal\GameIdleProcessor.fs" />
+        <Compile Include="Services\Internal\HomeDashboardQuery.fs" />
+        <Compile Include="Services\HomeDashboardService.fs" />
         <Compile Include="Services\GameFetcherService.fs" />
         <Compile Include="Services\Identity\AppUserStore.fs" />
         <Compile Include="Services\Identity\AppRoleStore.fs" />
