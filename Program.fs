@@ -36,6 +36,25 @@ module Program =
     [<EntryPoint>]
     let main args =
         printfn $"%s{JsonSerializer.Serialize({ Count = 2L }, typeof<GameCountReport>, DbCacheJsonSerializerOptions)}"
+        let str =
+            JsonSerializer.Serialize({ Games = [{
+                        Title = Some "Ra"
+                        Id = 2
+                        YearPublished = Some 1999
+                        BoxPlayTime = Some 30
+                        BoxMinPlayTime = Some 30
+                        BoxMaxPlayTime = Some 30
+                        BoxMinPlayers = Some 30
+                        BoxMaxPlayers = Some 30
+                        AddedAt = DateTime.Now
+                        UpdateStartedAt = None
+                        UpdateTouchedAt = DateTime.Now
+                        UpdateFinishedAt = None
+                        UpdateVersion = Some 2
+                        FetchedPlays = 3
+                        TotalPlays = 3
+                    }] }, typeof<GameListReport>, DbCacheJsonSerializerOptions)
+        printfn $"%s{str}"
             
         let builder = WebApplication.CreateSlimBuilder(args)
         
