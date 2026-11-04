@@ -37,6 +37,8 @@ module Program =
     [<EntryPoint>]
     let main args =
         printfn $"%s{JsonSerializer.Serialize({ Count = 2L }, typeof<GameCountReport>, DbCacheJsonSerializerOptions)}"
+        PreserveRecordFields<Game>
+        printfn $"%s{typeof<Game>.FullName}"
         let str =
             JsonSerializer.Serialize({ Games = [{
                         Title = Some "Ra"
@@ -55,8 +57,6 @@ module Program =
                         FetchedPlays = 3
                         TotalPlays = 3
                     }] }, typeof<GameListReport>, DbCacheJsonSerializerOptions)
-        PreserveRecordFields<Game>
-        printfn $"%s{typeof<Game>.FullName}"
         printfn $"%s{str}"
             
         let builder = WebApplication.CreateSlimBuilder(args)
