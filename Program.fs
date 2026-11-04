@@ -7,6 +7,7 @@ open System.Text.Json
 open System.Threading.Tasks
 open GameTime.Data.DbCache
 open GameTime.Data
+open GameTime.Data.Entities
 open GameTime.Data.Migrations
 open GameTime.Middleware
 open GameTime.Services.Identity
@@ -54,6 +55,7 @@ module Program =
                         FetchedPlays = 3
                         TotalPlays = 3
                     }] }, typeof<GameListReport>, DbCacheJsonSerializerOptions)
+        printfn $"%s{typeof<Game>.FullName}"
         printfn $"%s{str}"
             
         let builder = WebApplication.CreateSlimBuilder(args)
