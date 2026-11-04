@@ -2,23 +2,30 @@ module GameTime.Data.DbCache
 
 open System.Threading.Tasks
 open System.Text.Json
-open System.Text.Json.Serialization
+open Thoth.Json.Core.Auto
+open Thoth.Json.System.Text.Json
 
 open Dapper.FSharp.SQLite
 
 open GameTime.Data.Entities
-        
-let DbCacheJsonSerializerOptions =
-    JsonFSharpOptions.Default()
-        .ToJsonSerializerOptions()
 
+let extraJsonCoders =
+    Extra.empty
+    |> Extra.withInt64
+    |> Extra.withUInt64
+    |> Extra.withDecimal
+    |> Extra.withBigInt
+        
 let inline addToCache<'T> (dbContext: DbContext) key version (newItem: 'T)=
     task {
-        PreserveRecordFields<'T>
+        let value =
+            newItem
+            |> Encode.Auto.generateEncoderCached<'T> (extra = extraJsonCoders)
+            |> Encode.toString 0
         
         let newItemRow = { Id = key
                            Version = version
-                           Value = JsonSerializer.Serialize(newItem, typeof<'T>, DbCacheJsonSerializerOptions) }
+                           Value = value }
         
         let! _ =
             insert {
@@ -43,13 +50,11 @@ let inline getOrCreateFromCache<'T> (dbContext: DbContext) (key: string) (versio
             |> Seq.tryHead
             |> Option.bind (fun row ->
                 try
-                    Some (JsonSerializer.Deserialize(row.Value, typeof<'T>, DbCacheJsonSerializerOptions))
+                    row.Value
+                    |> Decode.fromString (Decode.Auto.generateDecoderCached<'T> (extra = extraJsonCoders))
+                    |> Result.toOption
                 with
                 | :? JsonException -> None)
-            |> Option.bind (fun value ->
-                match value with
-                | :? 'T as v -> Some v
-                | _ -> None)
             
         match foundItem with
         | Some item ->

@@ -94,6 +94,8 @@ module Program =
                     |> Option.defaultValue 100_000_000L
                     |> Nullable))
         
+        builder.Services.AddSingleton<HomeDashboardService>()
+        builder.Services.AddHostedService<HomeDashboardService>(_.GetRequiredService<HomeDashboardService>())
         builder.Services.AddSingleton<GameFetcherService>()
         builder.Services.AddHostedService<GameFetcherService>(_.GetRequiredService<GameFetcherService>())
         builder.Services.AddSingleton<ReportManager>()
