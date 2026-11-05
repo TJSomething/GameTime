@@ -155,6 +155,12 @@ type GameInitializationProcessor
     let writePlayerCountVotes (db: DbContext) (votes: PlayerCountVote seq) =
         task {
             let conn = db.GetConnection()
+            let id = votes |> Seq.head |> _.GameId
+            let! _ =
+                delete {
+                    for v in db.PlayerCountVote do
+                    where (v.GameId = id)
+                } |> db.GetConnection().DeleteAsync
             let! _ =
                 insert {
                     into db.PlayerCountVote

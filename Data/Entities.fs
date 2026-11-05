@@ -29,7 +29,7 @@ type Game =
       FetchedPlays: int
       TotalPlays: int }
     with
-    static member CURRENT_VERSION = 2
+    static member CURRENT_VERSION = 3
 
 type PlayerCountVote =
     { GameId: int
