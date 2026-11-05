@@ -50,7 +50,10 @@ type ListingView =
             monthlyPlayTable: string seq seq,
             playerCountRatingTable: string seq seq,
             timeLeft: TimeSpan option,
-            otherGamesAheadOfThisOne: int option
+            otherGamesAheadOfThisOne: int option,
+            usersRated: int option,
+            bayesAverageRating: double option,
+            averageWeight: double option
         ) =
         let statusBody =
             (match status with
@@ -60,6 +63,18 @@ type ListingView =
                        [ match year with
                          | Some y when y <> 0 -> str $"{title} ({y})"
                          | _ -> str title ] ]
+                 @ (match bayesAverageRating with
+                    | Some rating ->
+                        [ p [] [ str $"Geek rating: {rating:N2} / 10" ] ]
+                    | _ -> [])
+                 @ (match usersRated with
+                    | Some count ->
+                        [ p [] [ str $"Number of ratings: {count:N0}" ] ]
+                    | _ -> [])
+                 @ (match averageWeight with
+                    | Some rating ->
+                        [ p [] [ str $"Weight: %.2f{rating} / 5" ] ]
+                    | _ -> [])
                  @ (match minPlayers, maxPlayers with
                     | Some min, Some max ->
                         let countStr =
@@ -71,7 +86,7 @@ type ListingView =
                         [ p [] [ str $"Official player count: {countStr}" ] ]
                     | _ -> [])
                    @ [ p [] [ a [ _href $"https://boardgamegeek.com/boardgame/{id}/" ] [ str "BGG page" ] ]
-                       p [] [ str $"Plays: {playCount}" ]
+                       p [] [ str $"Plays: {playCount:PlayTimePercentile}" ]
                        p [] [ str $"Average play time: %.0f{averagePlayTime}" ]
                        h2 [] [ str "Player counts" ]
                        div [ _class "overflow-auto" ] (renderTable playerCountRatingTable)
@@ -86,7 +101,7 @@ type ListingView =
                        (if totalPlays = 0 then
                             [ p [] [ str "Waiting for game to start loading plays..." ] ]
                         else
-                            [ p [] [ str $"Loading plays: %d{playCount} / %d{totalPlays}" ] ])
+                            [ p [] [ str $"Loading plays: {playCount:N0} / {totalPlays:N0}" ] ])
                        (match otherGamesAheadOfThisOne with
                         | Some 1 -> [ p [] [ str "There is 1 game ahead of this one." ] ]
                         | None

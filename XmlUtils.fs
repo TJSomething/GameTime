@@ -26,3 +26,11 @@ let attrInt path attr (doc: XNode)  =
         match Int32.TryParse str with
         | true, n -> Some n
         | false, _ -> None)
+    
+let attrDouble path attr (doc: XNode)  =
+    doc
+    |> attrStr path attr
+    |> Option.bind (fun str ->
+        match Double.TryParse str with
+        | true, n -> Some n
+        | false, _ -> None)

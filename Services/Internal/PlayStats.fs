@@ -183,10 +183,14 @@ type PlayTimePercentileTableJob
             while! job.FetchAndProcessPlayPage() do
                 ()
             
-            return
-                { ModifiedAt = gameModifiedDateTime
-                  PercentileTable = job.BuildTable()
-                  Average = job.GetAverage() }
+            let percentileRows = job.CalculatePercentiles()
+            
+            let cacheEntry =
+               { ModifiedAt = gameModifiedDateTime
+                 PercentileTable = job.BuildTable(percentileRows)
+                 Average = job.GetAverage() } 
+            
+            return (percentileRows, cacheEntry)
         }
     
     static member STAT_VERSION = 1
@@ -246,9 +250,25 @@ type PlayTimePercentileTableJob
     
     member this.GetAverage () = average
     
-    member this.BuildTable () =
-        let ps = [ 0.1..0.1..0.9 ]
+    member this.CalculatePercentiles () =
+        let ps = [ 0.05..0.05..0.95 ]
+        
+        seq {
+            // Row for each player count
+            for playerCount, times in playerCountToTimes.Index() do
+                Array.Sort(times)
+                let playCount = times.Length
+                if playCount > 0 then
+                    let qs = Seq.map (fun p -> (p, Quantile.OfSorted.compute p times)) ps
 
+                    for p, q in qs do
+                        yield { GameId = id
+                                PlayerCount = Some playerCount
+                                Percentile = int (Math.Round(p * 100.0, 0))
+                                PlayTime = int (Math.Round(q, 0)) }
+        }
+    
+    member this.BuildTable (percentiles: PlayTimePercentile seq) =
         seq {
             // Header row
             yield
@@ -256,23 +276,28 @@ type PlayTimePercentileTableJob
                     yield "Players"
                     yield "Plays"
 
-                    for p in ps do
-                        yield (sprintf "%d%%" (int (p * 100.0)))
+                    for p in [10..10..90] do
+                        yield (sprintf "%d%%" p)
                 }
 
             // Row for each player count
-            for playerCount, times in playerCountToTimes.Index() do
-                Array.Sort(times)
-                let playCount = times.Length
-                if playCount > 0 then
-                    let qs = Seq.map (fun p -> Quantile.OfSorted.compute p times) ps
+            let percentileRows =
+                percentiles
+                |> Seq.groupBy _.PlayerCount
+                |> Seq.choose (fun (playerCountOpt, percentiles) ->
+                    match playerCountOpt with
+                    | Some p -> Some (p, percentiles)
+                    | None -> None)
+                |> Seq.sortBy fst
 
-                    yield
-                        seq {
-                            yield $"%d{playerCount}"
-                            yield $"%d{playCount}"
+            for playerCount, percentileRow in percentileRows do
+                yield
+                    seq {
+                        yield $"%d{playerCount}"
+                        yield $"%d{playerCountToTimes[playerCount].Length}"
 
-                            for q in qs do
-                                yield $"%.0f{q}"
-                        }
+                        for q in percentileRow do
+                            if q.Percentile % 10 = 0 then
+                                yield $"%d{q.PlayTime}"
+                    }
         }

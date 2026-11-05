@@ -27,7 +27,6 @@ type GameIdleProcessor
         serviceProvider: IServiceProvider,
         fetcher: XmlFetcher
     ) =
-    let currentGameVersion = Some 1
     
     let extractGameIds (xmlDoc: XDocument) =
         xmlDoc
@@ -253,6 +252,8 @@ join Play
             return missingHotIds
         }
         
+    static member CURRENT_GAME_VERSION = Some 2
+        
     // Once a minute, if no games are being fetched, check for each of these until a
     // matching game is found.
     //
@@ -296,11 +297,12 @@ join Play
                             
                             do! calcResultIfNeeded (fun () ->
                                 task {
+                                    let version = Some Game.CURRENT_VERSION
                                     let! oldGames =
                                         select {
                                             for g in dbContext.Game do
                                                 where (isNotNullValue g.UpdateFinishedAt)
-                                                andWhere (g.UpdateVersion < currentGameVersion || isNullValue g.UpdateVersion)
+                                                andWhere (g.UpdateVersion < version || isNullValue g.UpdateVersion)
                                                 orderBy g.Id
                                                 take 0 1
                                         }

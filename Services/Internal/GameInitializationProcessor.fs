@@ -54,7 +54,14 @@ type GameInitializationProcessor
                               BoxMaxPlayTime = None
                               BoxMinPlayers = None
                               BoxMaxPlayers = None
-                              UpdateVersion = Some 1 }
+                              UsersRated = None
+                              AverageRating = None
+                              BayesAverageRating = None
+                              StdDevRating = None
+                              Owned = None
+                              NumWeights = None
+                              AverageWeight = None
+                              UpdateVersion = Some Game.CURRENT_VERSION }
                     }
                     |> db.GetConnection().InsertAsync
 
@@ -68,7 +75,7 @@ type GameInitializationProcessor
                             setColumn g.UpdateTouchedAt DateTime.Now
                             setColumn g.FetchedPlays 0
                             setColumn g.TotalPlays 0
-                            setColumn g.UpdateVersion (Some 1)
+                            setColumn g.UpdateVersion (Some Game.CURRENT_VERSION)
                             where (g.Id = id)
                     }
                     |> db.GetConnection().UpdateAsync
@@ -78,7 +85,7 @@ type GameInitializationProcessor
 
     let rec fetchGame (id: int) =
         task {
-            let url = $"https://boardgamegeek.com/xmlapi2/thing?id=%d{id}&type=boardgame"
+            let url = $"https://boardgamegeek.com/xmlapi2/thing?id=%d{id}&type=boardgame&stats=1"
 
             return! fetcher.downloadXmlAsync url
         }
@@ -92,6 +99,13 @@ type GameInitializationProcessor
             let playTime = attrInt "//items/item/playingtime[@value]" "value" xmlDoc
             let minPlayTime = attrInt "//items/item/minplaytime[@value]" "value" xmlDoc
             let maxPlayTime = attrInt "//items/item/maxplaytime[@value]" "value" xmlDoc
+            let usersRated = attrInt "//items/item/statistics/ratings/usersrated[@value]" "value" xmlDoc
+            let average = attrDouble "//items/item/statistics/ratings/average[@value]" "value" xmlDoc
+            let bayesAverage = attrDouble "//items/item/statistics/ratings/bayesaverage[@value]" "value" xmlDoc
+            let stdDev = attrDouble "//items/item/statistics/ratings/stddev[@value]" "value" xmlDoc
+            let owned = attrInt "//items/item/statistics/ratings/owned[@value]" "value" xmlDoc
+            let numWeights = attrInt "//items/item/statistics/ratings/numweights[@value]" "value" xmlDoc
+            let averageWeight = attrDouble "//items/item/statistics/ratings/averageweight[@value]" "value" xmlDoc
 
             let! _ =
                 update {
@@ -103,6 +117,13 @@ type GameInitializationProcessor
                         setColumn g.BoxMaxPlayTime maxPlayTime
                         setColumn g.BoxMinPlayers minPlayers
                         setColumn g.BoxMaxPlayers maxPlayers
+                        setColumn g.UsersRated usersRated
+                        setColumn g.AverageRating average
+                        setColumn g.BayesAverageRating bayesAverage
+                        setColumn g.StdDevRating stdDev
+                        setColumn g.Owned owned
+                        setColumn g.NumWeights numWeights
+                        setColumn g.AverageWeight averageWeight
                         where (g.Id = id)
                 }
                 |> db.GetConnection().UpdateAsync

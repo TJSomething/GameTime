@@ -14,6 +14,13 @@ type Game =
       BoxMaxPlayTime: int option
       BoxMinPlayers: int option
       BoxMaxPlayers: int option
+      UsersRated: int option
+      AverageRating: double option
+      BayesAverageRating: double option
+      StdDevRating: double option
+      Owned: int option
+      NumWeights: int option
+      AverageWeight: double option
       AddedAt: DateTime
       UpdateStartedAt: DateTime option
       UpdateTouchedAt: DateTime
@@ -21,6 +28,8 @@ type Game =
       UpdateVersion: int option
       FetchedPlays: int
       TotalPlays: int }
+    with
+    static member CURRENT_VERSION = 2
 
 type PlayerCountVote =
     { GameId: int
@@ -63,6 +72,12 @@ type Report =
       Status: string
       Query: string
       Result: string option }
+
+type PlayTimePercentile =
+    { GameId: int
+      PlayerCount: int option
+      Percentile: int
+      PlayTime: int }
 
 /// Reference record fields to ensure that entities property names can be reflected for queries
 let inline PreserveRecordFields<'T> =

@@ -32,6 +32,7 @@
         <Compile Include="Data\Migrations\Migrate7.fs" />
         <Compile Include="Data\Migrations\Migrate8.fs" />
         <Compile Include="Data\Migrations\Migrate9.fs" />
+        <Compile Include="Data\Migrations\Migrate10.fs" />
         <Compile Include="Data\MigrationRunner.fs" />
         <Compile Include="Data\DbContext.fs" />
         <Compile Include="Data\DbCache.fs" />

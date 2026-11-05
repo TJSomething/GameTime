@@ -36,5 +36,5 @@ type HomeView =
               h2 [] [ str "Random most played" ]
               ul [] (renderGameList randomGames)
               h2 [] [ str "Statistics" ]
-              p [] [ str $"Games loaded: {gameCount}" ]
+              p [] [ str $"Games loaded: {gameCount:N0}" ]
               script [ _data "token" bggToken; _src $"{pathBase}/js/index.js" ] [] ]

@@ -20,7 +20,11 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, confi
         task {
             let key = PlayTimePercentileTableJob.GetCacheKey(id)
             let version = PlayTimePercentileTableJob.STAT_VERSION
-            let create () = PlayTimePercentileTableJob.Run(db, id, gameModifiedDateTime)
+            let create () =
+                task {
+                    let! _, table = PlayTimePercentileTableJob.Run(db, id, gameModifiedDateTime)
+                    return table
+                }
             let! cached = getOrCreateFromCache dbContext key version create
 
             // Reset cache entry if we have newer data
@@ -164,6 +168,9 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, confi
             let year = game |> Option.bind _.YearPublished
             let minPlayers = game |> Option.bind _.BoxMinPlayers
             let maxPlayers = game |> Option.bind _.BoxMaxPlayers
+            let bayesAverageRating = game |> Option.bind _.BayesAverageRating
+            let numRatings = game |> Option.bind _.UsersRated
+            let weight = game |> Option.bind _.AverageWeight
             
             let playerCountRatingTable =
                 playerCountRatingResults
@@ -219,7 +226,10 @@ type GameController(dbContext: DbContext, gameFetcher: GameFetcherService, confi
                     percentileTable = percentileTable,
                     monthlyPlayTable = monthlyPlayTable,
                     otherGamesAheadOfThisOne = gameOrder,
-                    playerCountRatingTable = playerCountRatingTable
+                    playerCountRatingTable = playerCountRatingTable,
+                    usersRated = numRatings,
+                    bayesAverageRating = bayesAverageRating,
+                    averageWeight = weight
                 )
 
             return

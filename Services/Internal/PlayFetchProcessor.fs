@@ -212,12 +212,25 @@ type PlayFetchProcessor(
             
             let now = DateTime.Now
             
-            let! playTimePercentileTable = PlayTimePercentileTableJob.Run(db, id, now)
+            let! percentileRows, playTimePercentileTable = PlayTimePercentileTableJob.Run(db, id, now)
             do! addToCache
                     db
                     (PlayTimePercentileTableJob.GetCacheKey(id))
                     PlayTimePercentileTableJob.STAT_VERSION
                     playTimePercentileTable
+            
+            if Seq.length percentileRows > 0 then
+                let! _ =
+                    delete {
+                        for s in db.PlayTimePercentile do
+                        where (s.GameId = id)
+                    } |> db.GetConnection().DeleteAsync
+                let! _ =
+                    insert {
+                        into db.PlayTimePercentile
+                        values (Seq.toList percentileRows)
+                    } |> db.GetConnection().InsertOrReplaceAsync
+                ()
                 
             let! _ =
                 db.GetConnection().ExecuteAsync(

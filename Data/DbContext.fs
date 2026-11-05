@@ -22,6 +22,9 @@ type DbContext() =
     member this.Play = table<Play>
     member this.PlayerCountVote = table<PlayerCountVote>
     member this.PlayAmountStats = table<PlayAmountStats>
+    member this.PlayTimePercentile =
+        PreserveRecordFields<PlayTimePercentile>
+        table<PlayTimePercentile>
     member this.CacheItem = table<CacheItem>
     member this.AppUser =
         PreserveRecordFields<AppUser>
