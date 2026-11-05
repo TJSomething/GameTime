@@ -86,7 +86,7 @@ type ListingView =
                         [ p [] [ str $"Official player count: {countStr}" ] ]
                     | _ -> [])
                    @ [ p [] [ a [ _href $"https://boardgamegeek.com/boardgame/{id}/" ] [ str "BGG page" ] ]
-                       p [] [ str $"Plays: {playCount:PlayTimePercentile}" ]
+                       p [] [ str $"Plays: {playCount:N0}" ]
                        p [] [ str $"Average play time: %.0f{averagePlayTime}" ]
                        h2 [] [ str "Player counts" ]
                        div [ _class "overflow-auto" ] (renderTable playerCountRatingTable)
