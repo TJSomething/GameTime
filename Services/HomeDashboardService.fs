@@ -109,7 +109,7 @@ type HomeDashboardService(serviceProvider: IServiceProvider, logger: ILogger<Hom
                                 dbContext
                                 (HomeDashboardService.getReportRecentTopGamesByPlayerCountKey(playerCount))
                                 HomeDashboardService.CACHE_VERSION
-                                randomGames
+                                games
                             
                     logger.LogDebug("Home refreshed")
                     
