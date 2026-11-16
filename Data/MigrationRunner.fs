@@ -24,6 +24,7 @@ let safeInit (conn: IDbConnection) =
             do! Migrate8.Run conn
             do! Migrate9.Run conn
             do! Migrate10.Run conn
+            do! Migrate11.Run conn
             let! _ = "PRAGMA foreign_keys = ON;" |> conn.ExecuteAsync
             isAlreadyInitialized <- true
             OptionTypes.register ()

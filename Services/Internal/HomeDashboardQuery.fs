@@ -131,3 +131,58 @@ join Game
             return { Games = randomGames }
         }
         
+    
+    member this.recentMostPlayedByPlayerCount (playerCount: int) =
+        task {
+            use conn = dbContext.GetConnection()
+           
+            // language=sql
+            let! topGames =
+                conn.QueryAsync<Game>(
+                    """
+WITH current_month AS (
+    SELECT
+        CAST(strftime('%Y', 'now') AS INTEGER) * 12 +
+        CAST(strftime('%m', 'now') AS INTEGER) - 1 AS value
+),
+game_max_month AS (
+    SELECT
+        GameId,
+        MAX(Month) AS Month
+    FROM PlayAmountStats
+    CROSS JOIN current_month
+    WHERE PlayerCount = @PlayerCount
+      AND Month IS NOT NULL
+      AND Month > current_month.value - 12
+      AND Month < current_month.value
+    GROUP BY GameId
+),
+recent_avg AS (
+    SELECT
+        game_max_month.GameId,
+        AVG(PlayCount) AS value,
+        COUNT(*) AS month_count
+    FROM game_max_month
+    JOIN PlayAmountStats
+      ON game_max_month.GameId = PlayAmountStats.GameId
+    WHERE game_max_month.Month - 3 <= PlayAmountStats.Month
+      AND PlayAmountStats.Month < game_max_month.Month
+      AND PlayAmountStats.PlayerCount = @PlayerCount
+    GROUP BY game_max_month.GameId
+)
+SELECT
+    Game.Id,
+    Game.Title,
+    Game.YearPublished,
+    CAST(recent_avg.value AS INTEGER) AS RecentMonthlyCount
+FROM Game
+JOIN recent_avg ON recent_avg.GameId = Game.Id
+WHERE recent_avg.month_count = 3
+ORDER BY recent_avg.value DESC
+LIMIT 100
+                    """,
+                    {| PlayerCount = playerCount |})
+            PreserveRecordFields<Game>
+            
+            return { Games = topGames }
+        }

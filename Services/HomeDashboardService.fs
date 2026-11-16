@@ -21,6 +21,10 @@ type HomeDashboardService(serviceProvider: IServiceProvider, logger: ILogger<Hom
     static member REPORT_RANDOM_GAMES_KEY = "dashboard-report:random-games"
     static member CACHE_VERSION = 1
     static member REFRESH_DURATION_SECONDS = 60
+    static member PLAYER_COUNT_MAX = 8
+        
+    static member getReportRecentTopGamesByPlayerCountKey (count: int) =
+        $"dashboard-report:recent-most-played:players:{count}"
     
     /// <summary>
     /// triggers an update of the dashboard
@@ -96,6 +100,16 @@ type HomeDashboardService(serviceProvider: IServiceProvider, logger: ILogger<Hom
                             HomeDashboardService.REPORT_RANDOM_GAMES_KEY
                             HomeDashboardService.CACHE_VERSION
                             randomGames
+                    
+                    for playerCount in [1..HomeDashboardService.PLAYER_COUNT_MAX] do
+                        let! games = queries.recentMostPlayedByPlayerCount(playerCount)
+                        
+                        do!
+                            addToCache
+                                dbContext
+                                (HomeDashboardService.getReportRecentTopGamesByPlayerCountKey(playerCount))
+                                HomeDashboardService.CACHE_VERSION
+                                randomGames
                             
                     logger.LogDebug("Home refreshed")
                     

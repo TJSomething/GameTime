@@ -34,6 +34,23 @@ type HomeController(dbContext: DbContext, config: AppConfig) =
                     HomeDashboardService.CACHE_VERSION
                     (fun () -> HomeDashboardQuery(dbContext).randomGames())
             
+            let! recentTopGamesByPlayerCount =
+                task {
+                    let mutable result = Map.empty
+                    
+                    for playerCount in [1..HomeDashboardService.PLAYER_COUNT_MAX] do
+                        let! games =
+                            getOrCreateFromCache
+                                dbContext
+                                (HomeDashboardService.getReportRecentTopGamesByPlayerCountKey(playerCount))
+                                HomeDashboardService.CACHE_VERSION
+                                (fun () -> HomeDashboardQuery(dbContext).recentMostPlayedByPlayerCount(playerCount))
+                        
+                        result <- result.Add(playerCount, games.Games)
+                        
+                    return result
+                }
+            
             return
                 Results.Content(
                     statusCode = 200,
@@ -44,6 +61,7 @@ type HomeController(dbContext: DbContext, config: AppConfig) =
                             gameCount = gameCount.Count,
                             recentGames = recentGames.Games,
                             randomGames = randomGames.Games,
+                            recentTopByPlayers = recentTopGamesByPlayerCount,
                             bggToken = config.BggFrontendToken
                         )
                         |> RenderView.AsString.htmlDocument)
