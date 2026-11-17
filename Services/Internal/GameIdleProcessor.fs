@@ -377,7 +377,7 @@ join Play
                 | None -> ()
                 
                 try
-                    do! Task.Delay(60_000, stoppingToken)
+                    do! Task.Delay(1000, stoppingToken)
                 with :? OperationCanceledException ->
                     ()
         }
